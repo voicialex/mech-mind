@@ -20,36 +20,37 @@ else()
 endif()
 
 set(SAMPLES
-    Basic/ConnectToCamera
-    Basic/ConnectAndCaptureImages
-    Basic/Capture2DImage
-    Basic/CaptureDepthMap
-    Basic/CapturePointCloudHDR
-    Basic/CapturePointCloud
-    Basic/CapturePointCloudWithNormals
-    Basic/SaveVirtualDevice
-    Advanced/CaptureStereo2DImages
-    Advanced/RenderDepthMap
-    Advanced/ConvertDepthMapToPointCloud
-    Advanced/MultipleCamerasCaptureSequentially
-    Advanced/MultipleCamerasCaptureSimultaneously
-    Advanced/CapturePeriodically
-    Advanced/Mapping2DImageToDepthMap
-    Advanced/RegisterCameraEvent
-    Advanced/SetParametersOfLaserCameras
-    Advanced/SetParametersOfUHPCameras
-    Advanced/TransformPointCloud
-    Util/GetCameraIntrinsics
-    Util/PrintCameraInfo
-    Util/SetPointCloudProcessingParameters
-    Util/SetScanningParameters
-    Util/SetDepthRange
-    Util/ManageUserSets
-    Util/SaveAndLoadUserSet
-    Calibration/HandEyeCalibration
-    Halcon/ConvertPointCloudToObjectModel3D
-    Pcl/ConvertPointCloudToPcl
-    Pcl/ConvertPointCloudWithNormalsToPcl
+    perception_app
+    # Basic/ConnectToCamera
+    # Basic/ConnectAndCaptureImages
+    # Basic/Capture2DImage
+    # Basic/CaptureDepthMap
+    # Basic/CapturePointCloudHDR
+    # Basic/CapturePointCloud
+    # Basic/CapturePointCloudWithNormals
+    # Basic/SaveVirtualDevice
+    # Advanced/CaptureStereo2DImages
+    # Advanced/RenderDepthMap
+    # Advanced/ConvertDepthMapToPointCloud
+    # Advanced/MultipleCamerasCaptureSequentially
+    # Advanced/MultipleCamerasCaptureSimultaneously
+    # Advanced/CapturePeriodically
+    # Advanced/Mapping2DImageToDepthMap
+    # Advanced/RegisterCameraEvent
+    # Advanced/SetParametersOfLaserCameras
+    # Advanced/SetParametersOfUHPCameras
+    # Advanced/TransformPointCloud
+    # Util/GetCameraIntrinsics
+    # Util/PrintCameraInfo
+    # Util/SetPointCloudProcessingParameters
+    # Util/SetScanningParameters
+    # Util/SetDepthRange
+    # Util/ManageUserSets
+    # Util/SaveAndLoadUserSet
+    # Calibration/HandEyeCalibration
+    # Halcon/ConvertPointCloudToObjectModel3D
+    # Pcl/ConvertPointCloudToPcl
+    # Pcl/ConvertPointCloudWithNormalsToPcl
     )
 
 set(PCL_DEPENDING
