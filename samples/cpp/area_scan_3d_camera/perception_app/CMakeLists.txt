@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD 14)
 set(SOURCES
     ${PROJECT_SOURCE_DIR}/CameraManager.cpp
     ${PROJECT_SOURCE_DIR}/ConfigHelper.cpp
+    ${PROJECT_SOURCE_DIR}/utils/CVWindow.cpp
+    ${PROJECT_SOURCE_DIR}/FrameSet.cpp
+    ${PROJECT_SOURCE_DIR}/CameraInfo.cpp
     ${PROJECT_SOURCE_DIR}/main.cpp)
 
 if(CMAKE_HOST_WIN32)

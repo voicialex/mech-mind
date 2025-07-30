@@ -26,6 +26,7 @@ public:
         bool save_depth_map = true;
         bool save_point_cloud = true;
         bool save_textured_point_cloud = true;
+        int max_save_count = 100; // 添加最大保存数量控制
 
         std::string save_2d_image_file(const std::string& suffix) const;
         std::string save_depth_map_file(const std::string& suffix) const;
