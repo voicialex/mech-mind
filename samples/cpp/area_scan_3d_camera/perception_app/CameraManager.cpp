@@ -168,8 +168,8 @@ void CameraManager::SaveImages(FrameSet& frame, const std::string& suffix)
     {
         std::string image_file = ConfigHelper::getInstance().save_config_.save_2d_image_file(suffix);
         if (cv::imwrite(image_file, frame.color)) {
-        std::cout << "Capture and save the 2D image: " << image_file << std::endl;
-        file_names.push_back(image_file); 
+            std::cout << "Capture and save the 2D image: " << image_file << std::endl;
+            file_names.push_back(image_file);
         } else {
             std::cerr << "Failed to save 2D image: " << image_file << std::endl;
         }
@@ -180,8 +180,8 @@ void CameraManager::SaveImages(FrameSet& frame, const std::string& suffix)
     {
         std::string depth_file = ConfigHelper::getInstance().save_config_.save_depth_map_file(suffix);
         if (cv::imwrite(depth_file, frame.depthImage)) {
-        std::cout << "Capture and save the depth map: " << depth_file << std::endl;
-        file_names.push_back(depth_file);
+            std::cout << "Capture and save the depth map: " << depth_file << std::endl;
+            file_names.push_back(depth_file);
         } else {
             std::cerr << "Failed to save depth map: " << depth_file << std::endl;
         }
