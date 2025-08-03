@@ -2,6 +2,7 @@
 output/
 build/
 build_*/
+dumps/
 
 # CMake 生成的文件
 CMakeCache.txt

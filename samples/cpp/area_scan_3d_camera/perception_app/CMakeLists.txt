@@ -43,7 +43,7 @@ if(NOT OpenCV_FOUND)
   )
 endif()
 
-include_directories(${MECHEYEAPI_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
+include_directories(${MECHEYEAPI_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
 link_directories(${MECHEYEAPI_LIBRARY_DIRS} ${OpenCV_LIBRARY_DIRS})
 
 add_executable(${PROJECT_NAME} ${SOURCES})

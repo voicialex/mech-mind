@@ -3,7 +3,8 @@
 #include <chrono>
 #include <thread>
 #include <opencv2/imgcodecs.hpp>
-#include "area_scan_3d_camera/api_util.h"
+// #include "area_scan_3d_camera/api_util.h"
+#include "utils/UtilHelper.h"
 #include "ConfigHelper.hpp"
 #include "CameraInfo.hpp"
 #include "utils/Logger.hpp"
@@ -37,17 +38,13 @@ bool CameraManager::Init()
 
 bool CameraManager::Connect()
 {
-    if (!findAndConnect(camera_))
+    if (!FindAndConnect(camera_))
         return false;
 
     mmind::eye::CameraInfo cameraInfo;
     showError(camera_.getCameraInfo(cameraInfo));
     printCameraInfo(cameraInfo);
 
-    if (!confirmCapture3D()) {
-        camera_.disconnect();
-        return false;
-    }
 
     CameraInfo::getInstance().InitCameraInfo(camera_);
     is_running_ = true;
