@@ -1,8 +1,10 @@
 #include <string>
 #include <atomic>
 #include <deque>
+#include <memory>
 #include "area_scan_3d_camera/Camera.h"
 #include "FrameSet.hpp"
+#include "utils/CVWindow.hpp"
 
 class CameraManager
 {
@@ -29,4 +31,5 @@ private:
     mmind::eye::Camera camera_;
     std::atomic<bool> is_running_ {false};
     std::deque<std::vector<std::string>> file_queue_;
+    std::unique_ptr<CVWindow> display_window_;
 };

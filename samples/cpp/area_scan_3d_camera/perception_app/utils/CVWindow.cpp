@@ -9,6 +9,7 @@
 #endif
 
 const std::string defaultKeyMapPrompt = "'Esc': Exit Window, '?': Show Key Map";
+
 CVWindow::CVWindow(std::string name, uint32_t width, uint32_t height)
     : name_(name),
       width_(width),

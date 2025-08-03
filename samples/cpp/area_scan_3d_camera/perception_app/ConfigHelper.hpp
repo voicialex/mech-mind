@@ -7,6 +7,8 @@ public:
     {
         bool enable = true;
         std::string window_title = "Real-time Capture Display";
+        int window_width = 1280;
+        int window_height = 720;
     } render_config_;
 
     struct CaptureConfig
@@ -33,6 +35,14 @@ public:
         std::string save_point_cloud_file(const std::string& suffix) const;
         std::string save_textured_point_cloud_file(const std::string& suffix) const;
     } save_config_;
+
+    struct LogConfig
+    {
+        bool enable = true;
+        std::string level = "INFO"; // DEBUG, INFO, WARNING, ERROR
+        bool show_timestamp = true;
+        bool show_level = true;
+    } log_config_;
 
 public:
     static ConfigHelper& getInstance() {
