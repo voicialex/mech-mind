@@ -1,4 +1,7 @@
 #include <string>
+#include <fstream>
+#include <iostream>
+#include <nlohmann/json.hpp>
 
 class ConfigHelper
 {
@@ -49,6 +52,10 @@ public:
         static ConfigHelper instance;
         return instance;
     }
+
+    // 添加配置加载函数
+    bool loadConfigFromJson(const std::string& configPath = "config/config.json");
+    void printConfig() const; // 用于调试，打印当前配置
 
 private:
     ConfigHelper() = default;
