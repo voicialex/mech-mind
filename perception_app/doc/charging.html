@@ -1,0 +1,2049 @@
+<html lang="zh-CN"><head>
+  <meta charset="UTF-8">
+  <title>充电枪自动插入完整流程时序</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: auto;
+      font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+      background: #f9f9f9;
+      line-height: 1.6;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 20px 0;
+    }
+
+    .section {
+      background: #fff;
+      border: 1px solid #eee;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      margin-bottom: 25px;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    h2 {
+      margin: 0;
+      color: #333;
+      border-left: 4px solid #409eff;
+      padding: 12px 20px;
+      font-size: 1.3rem;
+      background-color: #f7f9fc;
+      border-bottom: 1px solid #eee;
+    }
+
+    /* 时序图区域 */
+    .timeline-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mermaid-container {
+      position: relative;
+    }
+
+    .control-overlay {
+      position: sticky;
+      top: 15px;
+      align-self: flex-end;
+      background-color: rgba(255, 255, 255, 0.95);
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      padding: 8px;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      margin: 10px 20px 0 0;
+    }
+
+    button {
+      padding: 6px 12px;
+      background: #409eff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    button:hover:not(:disabled) {
+      background: #69b1ff;
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    button.secondary {
+      background: #67c23a;
+    }
+
+    button.warning {
+      background: #faad14;
+    }
+
+    .mermaid {
+      background: #fdfdfd;
+      padding: 20px;
+      overflow: auto;
+      margin: 0;
+      min-height: 300px;
+    }
+
+    .progress-container {
+      width: 100%;
+      height: 4px;
+      background-color: #f0f2f5;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background-color: #409eff;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background-color: #f7f9fc;
+      border-bottom: 1px solid #eee;
+      font-size: 0.9rem;
+    }
+
+    .status-text {
+      color: #31708f;
+      font-weight: 500;
+    }
+
+    .step-counter {
+      color: #666;
+    }
+
+    .device-status {
+      display: flex;
+      gap: 15px;
+      padding: 10px 20px;
+      background-color: #f7f9fc;
+      border-bottom: 1px solid #eee;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+    }
+
+    .device-indicator {
+      padding: 4px 10px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #f5f5f5;
+    }
+
+    .device-indicator .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: #ccc;
+      transition: background-color 0.3s;
+    }
+
+    .device-indicator .dot.online {
+      background-color: #52c41a;
+      box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.4);
+      animation: online-pulse 1.5s infinite;
+    }
+
+    .device-indicator .dot.error {
+      background-color: #f5222d;
+      animation: error-pulse 1s infinite alternate;
+    }
+
+    @keyframes online-pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.4);
+      }
+
+      70% {
+        box-shadow: 0 0 0 4px rgba(82, 196, 26, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+      }
+    }
+
+    @keyframes error-pulse {
+      from {
+        opacity: 0.7;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* 通信数据交互区域 */
+    .communication-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .legend {
+      display: flex;
+      gap: 15px;
+      padding: 10px 20px;
+      background-color: #f7f9fc;
+      border-bottom: 1px solid #eee;
+      font-size: 0.85rem;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-item span {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+
+    .communication-panel {
+      padding: 20px;
+      overflow: auto;
+      max-height: 500px;
+    }
+
+    .message {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 4px;
+      position: relative;
+      animation: fadeIn 0.5s ease;
+      font-size: 0.9rem;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(5px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* 消息类型颜色匹配 */
+    .message.type-request {
+      background-color: #d1eaff;
+      border-left: 3px solid #409eff;
+      margin-right: 20%;
+    }
+
+    .message.type-response {
+      background-color: #f6ffed;
+      border-left: 3px solid #67c23a;
+      margin-left: 20%;
+    }
+
+    .message.type-notify {
+      background-color: #fff7e6;
+      border-left: 3px solid #faad14;
+    }
+
+    .message.type-error {
+      background-color: #fff1f0;
+      border-left: 3px solid #f5222d;
+    }
+
+    .message-header {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #666;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+    }
+
+    .interaction-type {
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.8rem;
+      color: white;
+    }
+
+    .type-request .interaction-type {
+      background-color: #409eff;
+    }
+
+    .type-response .interaction-type {
+      background-color: #67c23a;
+    }
+
+    .type-notify .interaction-type {
+      background-color: #faad14;
+    }
+
+    .type-error .interaction-type {
+      background-color: #f5222d;
+    }
+
+    .message-body {
+      color: #333;
+      line-height: 1.5;
+      white-space: pre;
+      font-family: monospace;
+      font-size: 0.85rem;
+      font-weight: normal;
+      text-align: left;
+    }
+
+    .frame-formatted {
+      margin-top: 8px;
+      padding: 8px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+
+    .frame-section {
+      margin-bottom: 4px;
+    }
+
+    .frame-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .frame-label {
+      display: inline-block;
+      width: 120px;
+      color: #666;
+      font-weight: bold;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    /* 协议帧结构说明区域 */
+    .protocol-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .protocol-content {
+      padding: 20px;
+      overflow: visible;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-bottom: 20px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+      font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+    }
+
+    th {
+      background-color: #f5f7fa;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    code {
+      font-family: monospace;
+      color: #f5222d;
+      background-color: #f7f7f7;
+      padding: 1px 3px;
+      border-radius: 2px;
+      font-size: 0.85rem;
+    }
+
+    .protocol-diagram {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #fff;
+      border-radius: 6px;
+      border: 1px solid #eee;
+      overflow-x: auto;
+    }
+
+    .protocol-note {
+      background-color: #fff7e6;
+      border-left: 3px solid #faad14;
+      padding: 10px 15px;
+      margin: 15px 0;
+      font-size: 0.9rem;
+    }
+
+    .example-frame {
+      background-color: #f5f7fa;
+      padding: 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      margin: 10px 0;
+      overflow-x: auto;
+    }
+
+    .error-codes {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #fff;
+      border-radius: 6px;
+      border: 1px solid #eee;
+    }
+
+    .error-codes h3 {
+      margin-bottom: 10px;
+      color: #333;
+      font-size: 1.1rem;
+      margin-top: 0;
+    }
+
+    .error-code-table td:first-child {
+      font-family: monospace;
+      color: #333;
+    }
+
+    /* 协议帧结构表格样式 */
+    .protocol-frame-table {
+      table-layout: fixed;
+      min-width: 1000px;
+    }
+
+    .protocol-frame-table th {
+      width: 12.5%;
+      font-size: 0.85rem;
+      padding: 10px;
+    }
+
+    .protocol-frame-table td {
+      font-size: 0.85rem;
+      padding: 8px 10px;
+      height: 100%;
+      color: #000; /* 统一字体颜色为黑色 */
+    }
+
+    .protocol-frame-table .field-group {
+      background-color: #f9f9f9;
+    }
+
+    .protocol-frame-table .field-group-alt {
+      background-color: #f0f2f5;
+    }
+
+    .protocol-frame-table .field-name {
+      font-weight: bold;
+      color: #000; /* 统一字体颜色为黑色 */
+    }
+
+    .protocol-frame-table .field-length {
+      font-size: 0.8rem;
+      color: #faad14;
+      margin-left: 5px;
+    }
+
+    .section-description {
+      padding: 0 20px 15px;
+      color: #666;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .message-id-table th {
+      width: 15%;
+    }
+
+    /* 协议字段说明表格样式 */
+    .protocol-fields-table th {
+      width: 15%;
+    }
+    
+    .protocol-fields-table th:nth-child(3) {
+      width: 70%;
+    }
+    
+    /* 子消息ID表格样式 */
+    .sub-message-id-table th:nth-child(1) {
+      width: 15%;
+    }
+    .sub-message-id-table th:nth-child(2) {
+      width: 30%;
+    }
+    .sub-message-id-table th:nth-child(3) {
+      width: 55%;
+    }
+
+    /* CRC测试区域样式 */
+    .crc-test-section {
+      padding: 20px;
+      background-color: #f9f9f9;
+      border-radius: 6px;
+      margin-top: 20px;
+    }
+
+    .crc-test-section h3 {
+      margin-top: 0;
+      color: #333;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 10px;
+    }
+
+    .crc-test-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 15px;
+    }
+
+    .crc-input-section, .crc-output-section {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .crc-input-section h4, .crc-output-section h4 {
+      margin-bottom: 10px;
+      color: #666;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      min-height: 100px;
+      box-sizing: border-box;
+    }
+
+    .crc-actions {
+      margin-top: 10px;
+      text-align: right;
+    }
+
+    .crc-code-block {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      margin-top: 15px;
+      white-space: pre;
+      line-height: 1.5;
+      color: #333;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .crc-code-block .comment { color: #6A9955; }
+    .crc-code-block .keyword { color: #569CD6; font-weight: bold; }
+    .crc-code-block .type { color: #4EC9B0; }
+    .crc-code-block .function { color: #DCDCAA; }
+    .crc-code-block .string { color: #CE9178; }
+    .crc-code-block .number { color: #B5CEA8; }
+    .crc-code-block .preprocessor { color: #C586C0; }
+</style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- 时序图区域 -->
+    <div class="section timeline-section">
+      <h2>充电枪自动插入完整流程时序</h2>
+      <div class="status-bar">
+        <div class="status-text" id="statusText">准备就绪，请点击"开始"按钮启动流程</div>
+        <div class="step-counter">步骤: <span id="currentStepText">0</span>/<span id="totalStepsText">32</span></div>
+      </div>
+      <div class="progress-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <div class="mermaid-container">
+        <div class="control-overlay">
+          <button id="startBtn" onclick="startSimulation()">
+            <i class="fa fa-play"></i> 开始
+          </button>
+          <button id="nextBtn" onclick="nextStep()" disabled="">
+            <i class="fa fa-step-forward"></i> 下一步
+          </button>
+          <button id="autoBtn" onclick="toggleAutoMode()" disabled="">
+            <i class="fa fa-forward"></i> 自动
+          </button>
+          <button id="resetBtn" onclick="resetSimulation()" disabled="" class="warning">
+            <i class="fa fa-refresh"></i> 重置
+          </button>
+        </div>
+        <div id="sequence-diagram" class="mermaid">
+          sequenceDiagram
+            title 充电枪自动插入通信流程
+            participant 总控制室 as 总控制室
+            participant 中央总控制器 as 中央总控制器
+            participant 机械臂X as 机械臂设备X
+            participant 目标船体 as 目标船体
+
+            总控制室-&gt;&gt;中央总控制器: 1. 选择设备-X 开始充电 (请求)
+            中央总控制器--&gt;&gt;总控制室: 2. 充电请求接收确认 (响应)
+            中央总控制器-&gt;&gt;机械臂X: 3. 连接设备-X 启动充电 (请求)
+            机械臂X--&gt;&gt;中央总控制器: 4. 设备连接确认 (响应)
+            机械臂X--&gt;&gt;中央总控制器: 5. 状态周期反馈(连接中) (通知)
+            中央总控制器--&gt;&gt;总控制室: 6. 状态周期反馈(连接中) (通知)
+            
+            机械臂X-&gt;&gt;机械臂X: 7. 设备自检
+            机械臂X--&gt;&gt;中央总控制器: 8. 状态周期反馈(自检中) (通知)
+            中央总控制器--&gt;&gt;总控制室: 9. 状态周期反馈(自检中) (通知)
+            机械臂X--&gt;&gt;中央总控制器: 10. 自检结果反馈 (通知)
+            中央总控制器--&gt;&gt;总控制室: 11. 设备状态汇报 (通知)
+            
+            机械臂X-&gt;&gt;机械臂X: 12. 打开保护盖
+            机械臂X--&gt;&gt;中央总控制器: 13. 状态周期反馈(操作中) (通知)
+            中央总控制器--&gt;&gt;总控制室: 14. 状态周期反馈(操作中) (通知)
+            机械臂X--&gt;&gt;中央总控制器: 15. 保护盖操作反馈 (通知)
+            中央总控制器--&gt;&gt;总控制室: 16. 开盖状态汇报 (通知)
+            
+            机械臂X-&gt;&gt;机械臂X: 17. 目标船体检测
+            机械臂X--&gt;&gt;中央总控制器: 18. 状态周期反馈(检测中) (通知)
+            中央总控制器--&gt;&gt;总控制室: 19. 状态周期反馈(检测中) (通知)
+            机械臂X--&gt;&gt;中央总控制器: 20. 目标检测结果反馈 (通知)
+            中央总控制器--&gt;&gt;总控制室: 21. 目标状态汇报 (通知)
+            
+            机械臂X-&gt;&gt;机械臂X: 22. 动态识别与规划
+            机械臂X--&gt;&gt;中央总控制器: 23. 状态周期反馈(规划中) (通知)
+            中央总控制器--&gt;&gt;总控制室: 24. 状态周期反馈(规划中) (通知)
+            机械臂X--&gt;&gt;中央总控制器: 25. 规划结果反馈 (通知)
+            中央总控制器--&gt;&gt;总控制室: 26. 规划状态汇报 (通知)
+            
+            机械臂X-&gt;&gt;机械臂X: 27. 充电口定位与插入执行
+            机械臂X--&gt;&gt;中央总控制器: 28. 状态周期反馈(执行中) (通知)
+            中央总控制器--&gt;&gt;总控制室: 29. 状态周期反馈(执行中) (通知)
+            机械臂X-&gt;&gt;机械臂X: 30. 充电连接确认
+            机械臂X--&gt;&gt;中央总控制器: 31. 插入结果反馈 (通知)
+            中央总控制器--&gt;&gt;总控制室: 32. 最终执行结果汇报 (通知)
+        </div>
+      </div>
+      <div class="device-status">
+        <div class="device-indicator">
+          <span class="dot" id="armXStatus"></span> 机械臂设备X
+        </div>
+        <div class="device-indicator">
+          <span class="dot" id="mainCtrlStatus"></span> 中央总控制器
+        </div>
+        <div class="device-indicator">
+          <span class="dot" id="controlRoomStatus"></span> 总控制室
+        </div>
+        <div class="device-indicator">
+          <span class="dot" id="targetStatus"></span> 目标船体
+        </div>
+        <div class="device-indicator">
+          <span style="background-color: #409eff; width: 10px; height: 2px; display: inline-block;"></span> 请求
+        </div>
+        <div class="device-indicator">
+          <span style="background-color: #67c23a; width: 10px; height: 2px; display: inline-block; border-style: dashed;"></span> 响应
+        </div>
+        <div class="device-indicator">
+          <span style="background-color: #faad14; width: 10px; height: 2px; display: inline-block;"></span> 通知
+        </div>
+      </div>
+    </div>
+
+    <!-- 通信数据交互区域 -->
+    <div class="section communication-section">
+      <h2>通信数据交互</h2>
+      <div class="legend">
+        <div class="legend-item"><span style="background-color:#409eff"></span>Request: 请求指令</div>
+        <div class="legend-item"><span style="background-color:#67c23a"></span>Response: 结果响应</div>
+        <div class="legend-item"><span style="background-color:#faad14"></span>Notify: 通知</div>
+      </div>
+      <div class="communication-panel">
+        <div id="communicationLog">
+          <p style="color: #999; text-align: center; padding: 10px;">等待演示开始...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 协议帧结构说明区域 -->
+    <div class="section protocol-section">
+      <h2>传输层协议帧结构说明</h2>
+      <div class="section-description">
+        本协议定义了充电枪自动插入系统中各设备间的通信规范，规定了数据传输的格式和交互方式。
+      </div>
+      <div class="protocol-note">
+        <strong>注：</strong>协议头应该按照大端字节序发送
+      </div>
+      <div class="protocol-content">
+        <h3 style="margin-top: 0;">协议帧结构</h3>
+        <div class="protocol-diagram">
+          <table class="protocol-frame-table">
+            <thead>
+              <tr>
+                <th>byte 0</th>
+                <th>byte 1</th>
+                <th>byte 2</th>
+                <th>byte 3</th>
+                <th>byte 4</th>
+                <th>byte 5</th>
+                <th>byte 6</th>
+                <th>byte 7</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 第1行：0-7字节 -->
+              <tr class="field-group">
+                <td colspan="2">
+                  <div class="field-name">Magic ID</div>
+                </td>
+                <td colspan="2">
+                  <div class="field-name">CRC16</div>
+                </td>
+                <td>
+                  <div class="field-name">Message Type</div>
+                </td>
+                <td colspan="2">
+                  <div class="field-name">Message ID</div>
+                </td>
+                <td>
+                  <div class="field-name">Sub Message ID</div>
+                </td>
+              </tr>
+              
+              <!-- 第2行：8-15字节 -->
+              <tr class="field-group-alt">
+                <td colspan="2">
+                  <div class="field-name">Sequence</div>
+                </td>
+                <td colspan="2">
+                  <div class="field-name">Length</div>
+                </td>
+                <td colspan="4">
+                  <div class="field-name">Payload</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <h3>协议字段说明</h3>
+        <table class="protocol-fields-table">
+          <thead>
+            <tr>
+              <th>字段名称</th>
+              <th>取值范围</th>
+              <th>描述</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Magic ID</td>
+              <td>固定值0xBE01</td>
+              <td>固定起始魔术字符，用于帧同步和识别。用于快速识别有效帧</td>
+            </tr>
+            <tr>
+              <td>CRC16</td>
+              <td>0x0000-0xFFFF</td>
+              <td>数据校验值，用于数据完整性验证。从message type到payload字段的CRC校验值</td>
+            </tr>
+            <tr>
+              <td>Message Type</td>
+              <td>0-2</td>
+              <td>区分请求的类型。0=请求,1=响应,2=通知</td>
+            </tr>
+            <tr>
+              <td>Message ID</td>
+              <td>0x0000-0xFFFF</td>
+              <td>标识场景的数据，用于区分不同的消息类型和功能。具体定义参考Message ID表格</td>
+            </tr>
+            <tr>
+              <td>Sub Message ID</td>
+              <td>0x00-0xFF</td>
+              <td>子消息ID，用于表示具体阶段</td>
+            </tr>
+            <tr>
+              <td>Sequence</td>
+              <td>0x0000-0xFFFF</td>
+              <td>自增ID，用于消息跟踪和去重。每个message id独立计算，重发维持seq不变</td>
+            </tr>
+            <tr>
+              <td>Length</td>
+              <td>0x0000-0xFFFF</td>
+              <td>表示payload字段的长度。单位为字节</td>
+            </tr>
+            <tr>
+              <td>Payload</td>
+              <td>根据消息类型定义</td>
+              <td>具体业务数据内容。包含操作指令、状态、错误码等信息</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <h3>Message ID定义</h3>
+        <table class="message-id-table">
+          <thead>
+            <tr>
+              <th>Message ID</th>
+              <th>描述</th>
+              <th>Payload格式</th>
+              <th>适用类型</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>0x0001</td>
+              <td>开始充电</td>
+              <td>[设备ID(2byte)][状态码(2byte)]</td>
+              <td>Request, Response, Notify</td>
+            </tr>
+            <tr>
+              <td>0x0002</td>
+              <td>停止充电</td>
+              <td>[设备ID(2byte)][状态码(2byte)]</td>
+              <td>Request, Response, Notify</td>
+            </tr>
+            <tr>
+              <td>0x0003</td>
+              <td>紧急制动</td>
+              <td>[设备ID(2byte)][状态码(2byte)]</td>
+              <td>Request, Response, Notify</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <h3>Sub Message ID (阶段码) 定义</h3>
+        <table class="sub-message-id-table">
+          <thead>
+            <tr>
+              <th>阶段码 (Sub Message ID)</th>
+              <th>描述</th>
+              <th>适用消息ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>0x00</td>
+              <td>空闲/初始状态</td>
+              <td>所有</td>
+            </tr>
+            <tr>
+              <td>0x01</td>
+              <td>设备连接中</td>
+              <td>开始充电</td>
+            </tr>
+            <tr>
+              <td>0x02</td>
+              <td>设备自检中</td>
+              <td>开始充电</td>
+            </tr>
+            <tr>
+              <td>0x03</td>
+              <td>保护盖操作</td>
+              <td>开始充电、停止充电</td>
+            </tr>
+            <tr>
+              <td>0x04</td>
+              <td>目标检测中</td>
+              <td>开始充电</td>
+            </tr>
+            <tr>
+              <td>0x05</td>
+              <td>路径规划中</td>
+              <td>开始充电</td>
+            </tr>
+            <tr>
+              <td>0x06</td>
+              <td>充电口插入</td>
+              <td>开始充电</td>
+            </tr>
+            <tr>
+              <td>0x07</td>
+              <td>充电口拔出</td>
+              <td>停止充电</td>
+            </tr>
+            <tr>
+              <td>0x08</td>
+              <td>连接验证</td>
+              <td>开始充电</td>
+            </tr>
+            <tr>
+              <td>0x09</td>
+              <td>操作完成</td>
+              <td>所有</td>
+            </tr>
+            <tr>
+              <td>0xFF</td>
+              <td>操作异常</td>
+              <td>所有</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <h3>状态码（错误码）</h3>
+        <table class="error-code-table">
+          <thead>
+            <tr>
+              <th>状态码/错误码</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>0x0000</td>
+              <td>成功</td>
+            </tr>
+            <tr>
+              <td>0x0010</td>
+              <td>设备未连接</td>
+            </tr>
+            <tr>
+              <td>0x0020</td>
+              <td>设备自检失败</td>
+            </tr>
+            <tr>
+              <td>0x0030</td>
+              <td>目标识别失败</td>
+            </tr>
+            <tr>
+              <td>0x0050</td>
+              <td>保护盖操作失败</td>
+            </tr>
+            <tr>
+              <td>0x0060</td>
+              <td>路径规划失败</td>
+            </tr>
+            <tr>
+              <td>0x0070</td>
+              <td>插入定位失败</td>
+            </tr>
+            <tr>
+              <td>0x0080</td>
+              <td>充电连接失败</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="crc-test-section">
+          <h3>CRC16算法</h3>
+          <div class="crc-test-container">
+            <div class="crc-input-section">
+              <h4>输入数据 (十六进制，空格分隔)</h4>
+              <textarea id="crcInput">BE 01 00 00 00 00 01 00 01 00 06 00 01 00 00 00 00 01</textarea>
+              <div class="crc-actions">
+                <button id="calculateCrcBtn" onclick="calculateCRC()">计算CRC16</button>
+              </div>
+            </div>
+            <div class="crc-output-section">
+              <h4>计算结果</h4>
+              <textarea id="crcOutput" readonly></textarea>
+            </div>
+          </div>
+          
+          <h4>CRC16算法C语言实现</h4>
+          <div class="crc-code-block">
+<span class="preprocessor">#include</span> <span class="string">&lt;stdint.h&gt;</span>
+<span class="preprocessor">#include</span> <span class="string">&lt;stddef.h&gt;</span>
+
+<span class="keyword">static</span> <span class="keyword">const</span> <span class="type">uint16_t</span> crc16_ibm_table[<span class="number">256</span>] = {
+    <span class="placeholder" id="crc16TablePlaceholder"></span>
+};
+
+<span class="comment">/**
+ * 计算CRC16-IBM校验值（Modbus协议适用）
+ * @param data 输入数据指针
+ * @param length 数据长度
+ * @return 计算得到的CRC16值
+ */</span>
+<span class="type">uint16_t</span> <span class="function">crc16_ibm</span>(<span class="type">const uint8_t</span> *data, <span class="type">size_t</span> length) {
+    <span class="type">uint16_t</span> crc = <span class="number">0xFFFF</span>;  <span class="comment">// 初始值，符合Modbus标准</span>
+    
+    <span class="keyword">if</span> (data == <span class="keyword">NULL</span> || length == <span class="number">0</span>) {
+        <span class="keyword">return</span> crc;  <span class="comment">// 空数据返回初始值</span>
+    }
+    
+    <span class="keyword">for</span> (<span class="type">size_t</span> i = <span class="number">0</span>; i &lt; length; i++) {
+        crc = (crc &gt;&gt; <span class="number">8</span>) ^ crc16_ibm_table[(crc ^ data[i]) &amp; <span class="number">0xFF</span>];
+    }
+    
+    <span class="keyword">return</span> crc;
+}
+
+<span class="comment">// 示例用法</span>
+<span class="comment">/*
+#include &lt;stdio.h&gt;
+
+int main() {
+    // Modbus协议测试数据
+    const uint8_t test_data[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x01};
+    uint16_t crc = crc16_ibm(test_data, sizeof(test_data));
+    
+    printf("测试数据长度: %zu字节\n", sizeof(test_data));
+    printf("CRC16-IBM (Modbus): 0x%04X\n", crc);  // 应输出0x840A
+    
+    return 0;
+}
+*/</span>
+          </div>
+          <script>
+            // 动态生成C语言代码中的CRC16查找表，确保与JavaScript版本一致
+            document.addEventListener('DOMContentLoaded', function() {
+              const placeholder = document.getElementById('crc16TablePlaceholder');
+              if (placeholder && typeof crc16_ibm_table !== 'undefined') {
+                let tableContent = '';
+                crc16_ibm_table.forEach((value, index) => {
+                  // 每8个值一行
+                  if (index % 8 === 0) {
+                    tableContent += '    ';
+                  }
+                  tableContent += `0x${value.toString(16).toUpperCase().padStart(4, '0')}, `;
+                  if (index % 8 === 7) {
+                    tableContent += '\n';
+                  }
+                });
+                // 移除最后一个逗号
+                tableContent = tableContent.replace(/, $/, '');
+                placeholder.textContent = tableContent;
+              }
+            });
+          </script>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      sequence: {
+        showSequenceNumbers: true,
+        messageFontSize: 13,
+        actorFontSize: 13,
+        useMaxWidth: false
+      }
+    });
+
+    let currentStep = 0;
+    const totalSteps = 32;
+    let isRunning = false;
+    let isAutoMode = false;
+    let sequence = 1;
+    let animationTimer = null;
+    let isErrorState = false;
+
+    const MAGIC_ID = 0xBE01;
+    const MessageType = {
+      Request: 0x00,
+      Response: 0x01,
+      Notify: 0x02
+    };
+    
+    // 操作码定义
+    const OperationCode = {
+      SelectDevice: 0x01,
+      ConnectDevice: 0x02,
+      SelfCheck: 0x03,
+      OpenCover: 0x04,
+      DetectTarget: 0x05,
+      PathPlanning: 0x06,
+      InsertChargingGun: 0x07,
+      RemoveChargingGun: 0x08,
+      VerifyConnection: 0x09,
+      StatusReport: 0x0A
+    };
+    
+    // 阶段码定义 (作为Sub Message ID)
+    const StageCode = {
+      Idle: 0x00,
+      Connecting: 0x01,
+      DeviceSelfCheck: 0x02,
+      CoverOperation: 0x03,
+      TargetDetection: 0x04,
+      PathPlanning: 0x05,
+      Insertion: 0x06,
+      Removal: 0x07,
+      ConnectionVerification: 0x08,
+      Completed: 0x09,
+      Error: 0xFF
+    };
+    
+    const Status = {
+      Normal: 0x00,
+      Running: 0x01,
+      Completed: 0x02,
+      Error: 0x03
+    };
+    
+    // 错误码
+    const ErrorCode = {
+      Success: 0x0000,
+      DeviceDisconnected: 0x0010,
+      SelfCheckFailed: 0x0020,
+      TargetRecognitionFailed: 0x0030,
+      CoverOperationFailed: 0x0050,
+      PathPlanningFailed: 0x0060,
+      InsertionFailed: 0x0070,
+      RemovalFailed: 0x0071,
+      ConnectionFailed: 0x0080
+    };
+    
+    // Message ID定义
+    const MessageId = {
+      StartCharging: 0x0001,  // 开始充电
+      StopCharging: 0x0002,   // 停止充电
+      EmergencyStop: 0x0003   // 紧急制动
+    };
+
+    // 步骤定义 - 使用设备ID=1 (0x0001)
+    const steps = [
+      {
+        title: "选择设备-X 开始充电",
+        sender: "总控制室",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Request,
+        status: Status.Normal,
+        stage: StageCode.Idle,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.SelectDevice,
+        deviceId: 0x0001, // 设备ID=1
+        sendPayload: [],
+        statusText: "总控制室向中央总控制器发送充电请求，指定设备X"
+      },
+      {
+        title: "充电请求接收确认",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Response,
+        status: Status.Normal,
+        stage: StageCode.Idle,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.SelectDevice,
+        deviceId: 0x0001,
+        sendPayload: [],
+        statusText: "中央总控制器确认收到总控制室的充电请求"
+      },
+      {
+        title: "连接设备-X 启动充电",
+        sender: "中央总控制器",
+        receiver: "机械臂设备X",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Request,
+        status: Status.Normal,
+        stage: StageCode.Connecting,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.ConnectDevice,
+        deviceId: 0x0001,
+        sendPayload: [],
+        statusText: "中央总控制器向机械臂设备X发送连接与启动指令"
+      },
+      {
+        title: "设备连接确认",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Response,
+        status: Status.Running,
+        stage: StageCode.Connecting,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.ConnectDevice,
+        deviceId: 0x0001,
+        sendPayload: [],
+        statusText: "机械臂设备X确认已接收启动指令并建立连接"
+      },
+      {
+        title: "状态周期反馈(连接中)",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.Connecting,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x30], // 进度48%
+        statusText: "机械臂设备X向中央总控制器发送周期状态反馈，当前进度48%"
+      },
+      {
+        title: "状态周期反馈(连接中)",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.Connecting,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x30], // 进度48%
+        statusText: "中央总控制器向总控制室发送周期状态反馈，当前进度48%"
+      },
+      {
+        title: "设备自检",
+        sender: "机械臂设备X",
+        receiver: "机械臂设备X",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Request,
+        status: Status.Normal,
+        stage: StageCode.DeviceSelfCheck,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.SelfCheck,
+        deviceId: 0x0001,
+        sendPayload: [0x01], // 标准检测模式
+        statusText: "机械臂设备X执行设备自检"
+      },
+      {
+        title: "状态周期反馈(自检中)",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.DeviceSelfCheck,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x50], // 进度80%
+        statusText: "机械臂设备X向中央总控制器发送周期状态反馈，当前进度80%"
+      },
+      {
+        title: "状态周期反馈(自检中)",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.DeviceSelfCheck,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x50], // 进度80%
+        statusText: "中央总控制器向总控制室发送周期状态反馈，当前进度80%"
+      },
+      {
+        title: "自检结果反馈",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.DeviceSelfCheck,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.SelfCheck,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x0A], // 检测结果
+        statusText: "机械臂设备X向中央总控制器反馈自检结果"
+      },
+      {
+        title: "设备状态汇报",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.DeviceSelfCheck,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x0A], // 检测结果
+        statusText: "中央总控制器向总控制室汇报设备自检状态"
+      },
+      {
+        title: "打开保护盖",
+        sender: "机械臂设备X",
+        receiver: "机械臂设备X",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Request,
+        status: Status.Normal,
+        stage: StageCode.CoverOperation,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.OpenCover,
+        deviceId: 0x0001,
+        sendPayload: [0x01], // 打开指令
+        statusText: "机械臂设备X执行打开保护盖操作"
+      },
+      {
+        title: "状态周期反馈(操作中)",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.CoverOperation,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x70], // 进度112%
+        statusText: "机械臂设备X向中央总控制器发送周期状态反馈，当前进度112%"
+      },
+      {
+        title: "状态周期反馈(操作中)",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.CoverOperation,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x70], // 进度112%
+        statusText: "中央总控制器向总控制室发送周期状态反馈，当前进度112%"
+      },
+      {
+        title: "保护盖操作反馈",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.CoverOperation,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.OpenCover,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x03], // 操作结果
+        statusText: "机械臂设备X向中央总控制器反馈保护盖操作结果"
+      },
+      {
+        title: "开盖状态汇报",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.CoverOperation,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x03], // 操作结果
+        statusText: "中央总控制器向总控制室汇报保护盖状态"
+      },
+      {
+        title: "目标船体检测",
+        sender: "机械臂设备X",
+        receiver: "机械臂设备X",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Request,
+        status: Status.Normal,
+        stage: StageCode.TargetDetection,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.DetectTarget,
+        deviceId: 0x0001,
+        sendPayload: [0x01], // 标准检测模式
+        statusText: "机械臂设备X执行目标船体检测"
+      },
+      {
+        title: "状态周期反馈(检测中)",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.TargetDetection,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x60], // 进度96%
+        statusText: "机械臂设备X向中央总控制器发送周期状态反馈，当前进度96%"
+      },
+      {
+        title: "状态周期反馈(检测中)",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.TargetDetection,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x60], // 进度96%
+        statusText: "中央总控制器向总控制室发送周期状态反馈，当前进度96%"
+      },
+      {
+        title: "目标检测结果反馈",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.TargetDetection,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.DetectTarget,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x01], // 检测结果
+        statusText: "机械臂设备X向中央总控制器反馈目标检测结果"
+      },
+      {
+        title: "目标状态汇报",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.TargetDetection,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x01], // 检测结果
+        statusText: "中央总控制器向总控制室汇报目标检测状态"
+      },
+      {
+        title: "动态识别与规划",
+        sender: "机械臂设备X",
+        receiver: "机械臂设备X",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Request,
+        status: Status.Normal,
+        stage: StageCode.PathPlanning,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.PathPlanning,
+        deviceId: 0x0001,
+        sendPayload: [0x01, 0x05], // 规划模式和参数
+        statusText: "机械臂设备X执行动态识别与路径规划"
+      },
+      {
+        title: "状态周期反馈(规划中)",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.PathPlanning,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x50], // 进度80%
+        statusText: "机械臂设备X向中央总控制器发送周期状态反馈，当前进度80%"
+      },
+      {
+        title: "状态周期反馈(规划中)",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.PathPlanning,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x50], // 进度80%
+        statusText: "中央总控制器向总控制室发送周期状态反馈，当前进度80%"
+      },
+      {
+        title: "规划结果反馈",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.PathPlanning,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.PathPlanning,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x05], // 规划结果
+        statusText: "机械臂设备X向中央总控制器反馈规划结果"
+      },
+      {
+        title: "规划状态汇报",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.PathPlanning,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x05], // 规划结果
+        statusText: "中央总控制器向总控制室汇报规划状态"
+      },
+      {
+        title: "充电口定位与插入执行",
+        sender: "机械臂设备X",
+        receiver: "机械臂设备X",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Request,
+        status: Status.Normal,
+        stage: StageCode.Insertion,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.InsertChargingGun,
+        deviceId: 0x0001,
+        sendPayload: [0x01, 0x00, 0x78, 0x01, 0x5E], // 定位参数
+        statusText: "机械臂设备X执行充电口定位与插入操作"
+      },
+      {
+        title: "状态周期反馈(执行中)",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.Insertion,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x30], // 进度48%
+        statusText: "机械臂设备X向中央总控制器发送周期状态反馈，当前进度48%"
+      },
+      {
+        title: "状态周期反馈(执行中)",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Running,
+        stage: StageCode.Insertion,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x30], // 进度48%
+        statusText: "中央总控制器向总控制室发送周期状态反馈，当前进度48%"
+      },
+      {
+        title: "充电连接确认",
+        sender: "机械臂设备X",
+        receiver: "机械臂设备X",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Request,
+        status: Status.Normal,
+        stage: StageCode.ConnectionVerification,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.VerifyConnection,
+        deviceId: 0x0001,
+        sendPayload: [0x01, 0x00, 0xC8, 0x00, 0x64], // 连接参数
+        statusText: "机械臂设备X执行充电连接确认"
+      },
+      {
+        title: "插入结果反馈",
+        sender: "机械臂设备X",
+        receiver: "中央总控制器",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.Insertion,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.InsertChargingGun,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x00, 0x00, 0xC8], // 插入结果
+        statusText: "机械臂设备X向中央总控制器反馈插入结果"
+      },
+      {
+        title: "最终执行结果汇报",
+        sender: "中央总控制器",
+        receiver: "总控制室",
+        sendMsgId: MessageId.StartCharging,
+        sendType: MessageType.Notify,
+        status: Status.Completed,
+        stage: StageCode.Completed,
+        errorCode: ErrorCode.Success,
+        opCode: OperationCode.StatusReport,
+        deviceId: 0x0001,
+        sendPayload: [0x00, 0x01, 0x01], // 最终状态
+        statusText: "中央总控制器向总控制室反馈最终充电连接状态"
+      }
+    ];
+
+    const errorStep = {
+      title: "操作执行错误",
+      sender: "中央总控制器",
+      receiver: "总控制室",
+      sendMsgId: MessageId.StartCharging,
+      sendType: MessageType.Notify,
+      status: Status.Error,
+      stage: StageCode.Error,
+      errorCode: ErrorCode.InsertionFailed,
+      opCode: OperationCode.StatusReport,
+      deviceId: 0x0001,
+      sendPayload: [0x03, 0x07], // 错误详情
+      statusText: "中央总控制器向总控制室报告机械臂插入操作失败"
+    };
+
+    // 实现与C语言相同的CRC16算法
+    // CRC-16-IBM 预计算查找表
+    const crc16_ibm_table = [
+      0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
+      0xC601, 0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440,
+      0xCC01, 0x0CC0, 0x0D80, 0xCD41, 0x0F00, 0xCFC1, 0xCE81, 0x0E40,
+      0x0A00, 0xCAC1, 0xCB81, 0x0B40, 0xC901, 0x09C0, 0x0880, 0xC841,
+      0xD801, 0x18C0, 0x1980, 0xD941, 0x1B00, 0xDBC1, 0xDA81, 0x1A40,
+      0x1E00, 0xDEC1, 0xDF81, 0x1F40, 0xDD01, 0x1DC0, 0x1C80, 0xDC41,
+      0x1400, 0xD4C1, 0xD581, 0x1540, 0xD701, 0x17C0, 0x1680, 0xD641,
+      0xD201, 0x12C0, 0x1380, 0xD341, 0x1100, 0xD1C1, 0xD081, 0x1040,
+      0xF001, 0x30C0, 0x3180, 0xF141, 0x3300, 0xF3C1, 0xF281, 0x3240,
+      0x3600, 0xF6C1, 0xF781, 0x3740, 0xF501, 0x35C0, 0x3480, 0xF441,
+      0x3C00, 0xFCC1, 0xFD81, 0x3D40, 0xFF01, 0x3FC0, 0x3E80, 0xFE41,
+      0xFA01, 0x3AC0, 0x3B80, 0xFB41, 0x3900, 0xF9C1, 0xF881, 0x3840,
+      0x2800, 0xE8C1, 0xE981, 0x2940, 0xEB01, 0x2BC0, 0x2A80, 0xEA41,
+      0xEE01, 0x2EC0, 0x2F80, 0xEF41, 0x2D00, 0xEDC1, 0xEC81, 0x2C40,
+      0xE401, 0x24C0, 0x2580, 0xE541, 0x2700, 0xE7C1, 0xE681, 0x2640,
+      0x2200, 0xE2C1, 0xE381, 0x2340, 0xE101, 0x21C0, 0x2080, 0xE041,
+      0xA001, 0x60C0, 0x6180, 0xA141, 0x6300, 0xA3C1, 0xA281, 0x6240,
+      0x6600, 0xA6C1, 0xA781, 0x6740, 0xA501, 0x65C0, 0x6480, 0xA441,
+      0x6C00, 0xACC1, 0xAD81, 0x6D40, 0xAF01, 0x6FC0, 0x6E80, 0xAE41,
+      0xAA01, 0x6AC0, 0x6B80, 0xAB41, 0x6900, 0xA9C1, 0xA881, 0x6840,
+      0x7800, 0xB8C1, 0xB981, 0x7940, 0xBB01, 0x7BC0, 0x7A80, 0xBA41,
+      0xBE01, 0x7EC0, 0x7F80, 0xBF41, 0x7D00, 0xBDC1, 0xBC81, 0x7C40,
+      0xB401, 0x74C0, 0x7580, 0xB541, 0x7700, 0xB7C1, 0xB681, 0x7640,
+      0x7200, 0xB2C1, 0xB381, 0x7340, 0xB101, 0x71C0, 0x7080, 0xB041,
+      0x5000, 0x90C1, 0x9181, 0x5140, 0x9301, 0x53C0, 0x5280, 0x9241,
+      0x9601, 0x56C0, 0x5780, 0x9741, 0x5500, 0x95C1, 0x9481, 0x5440,
+      0x9C01, 0x5CC0, 0x5D80, 0x9D41, 0x5F00, 0x9FC1, 0x9E81, 0x5E40,
+      0x5A00, 0x9AC1, 0x9B81, 0x5B40, 0x9901, 0x59C0, 0x5880, 0x9841,
+      0x8801, 0x48C0, 0x4980, 0x8941, 0x4B00, 0x8BC1, 0x8A81, 0x4A40,
+      0x4E00, 0x8EC1, 0x8F81, 0x4F40, 0x8D01, 0x4DC0, 0x4C80, 0x8C41,
+      0x4400, 0x84C1, 0x8581, 0x4540, 0x8701, 0x47C0, 0x4680, 0x8641,
+      0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
+    ];
+
+    // CRC-16-IBM 算法实现: 多项式0x8005，初始值0x0000，使用查找表
+    function crc16(data) {
+      let crc = 0xFFFF;  // 初始值，与C语言版本保持一致（符合Modbus标准）
+      
+      for (let b of data) {
+        crc = (crc >>> 8) ^ crc16_ibm_table[(crc ^ b) & 0xFF];
+        crc &= 0xFFFF; // 确保是16位
+      }
+      
+      return crc;
+    }
+
+    // 计算CRC并格式化显示结果
+    function calculateCRC() {
+      const input = document.getElementById('crcInput').value.trim();
+      if (!input) {
+        document.getElementById('crcOutput').value = "请输入十六进制数据";
+        return;
+      }
+      
+      try {
+        // 解析输入数据
+        const bytes = input.split(/\s+/).map(b => parseInt(b, 16));
+        
+        // 使用全部输入数据计算CRC
+        const crcData = bytes;
+        
+        // 计算CRC
+        const crcResult = crc16(crcData);
+        const crcHex = crcResult.toString(16).padStart(4, '0').toUpperCase();
+        
+        // 格式化输出
+        let output = `CRC16结果: 0x${crcHex}\n\n`;
+        output += `输入数据长度: ${bytes.length} 字节\n`;
+        output += `参与计算的字节数: ${crcData.length} 字节`;
+        
+        document.getElementById('crcOutput').value = output;
+      } catch (e) {
+        document.getElementById('crcOutput').value = `计算错误: ${e.message}`;
+      }
+    }
+
+    function getMessageIdInfo(id) {      const messageIds = {        0x0001: "Start Charging",        0x0002: "Stop Charging",        0x0003: "Emergency Stop"      };      return messageIds[id] || "Unknown";    }
+
+    function getMessageTypeInfo(type) {
+      const types = {
+        0x00: {name: "Request", class: "type-request"},
+        0x01: {name: "Response", class: "type-response"},
+        0x02: {name: "Notify", class: "type-notify"}
+      };
+      return types[type] || {name: "Unknown", class: ""};
+    }
+
+    function getStatusText(status) {
+      const statuses = {
+        0x00: "正常",
+        0x01: "运行中",
+        0x02: "完成",
+        0x03: "错误"
+      };
+      return statuses[status] || "未知";
+    }
+
+    function getStageText(stage) {
+      const stages = {
+        0x00: "空闲/初始状态",
+        0x01: "设备连接中",
+        0x02: "设备自检中",
+        0x03: "保护盖操作",
+        0x04: "目标检测中",
+        0x05: "路径规划中",
+        0x06: "充电口插入",
+        0x07: "充电口拔出",
+        0x08: "连接验证",
+        0x09: "操作完成",
+        0xFF: "操作异常"
+      };
+      return stages[stage] || "未知";
+    }
+
+    function getOperationText(opCode) {
+      const operations = {
+        0x01: "选择设备",
+        0x02: "连接设备",
+        0x03: "设备自检",
+        0x04: "保护盖操作",
+        0x05: "目标检测",
+        0x06: "路径规划",
+        0x07: "充电枪插入",
+        0x08: "充电枪拔出",
+        0x09: "连接验证",
+        0x0A: "状态报告"
+      };
+      return operations[opCode] || "未知操作";
+    }
+
+    function getErrorCodeText(code) {
+      const codes = {
+        0x0000: "成功",
+        0x0010: "设备未连接",
+        0x0020: "设备自检失败",
+        0x0030: "目标识别失败",
+        0x0050: "保护盖操作失败",
+        0x0060: "路径规划失败",
+        0x0070: "插入定位失败",
+        0x0071: "拔出操作失败",
+        0x0080: "充电连接失败"
+      };
+      return codes[code] || `未知错误 (0x${code.toString(16).toUpperCase()})`;
+    }
+
+    function buildFrame(msgId, msgType, status, stage, errorCode, opCode, deviceId, payload) {
+      // 构建帧的各个部分
+      const header = new Uint8Array(10);
+      let view = new DataView(header.buffer);
+      
+      view.setUint16(0, MAGIC_ID, false);  // Magic ID (BE01)
+      view.setUint8(4, msgType);           // Message Type at byte 4
+      view.setUint16(5, msgId, false);     // Message ID at bytes 5-6
+      view.setUint8(7, stage);             // Sub Message ID (stage) at byte 7
+      view.setUint16(8, sequence, false);  // Sequence at bytes 8-9
+      
+      // 构建扩展头部 - 包含操作码、状态码和2字节设备ID
+      // 注意：根据需求，当设备ID为0x0001时，状态码固定为0x0000
+      const extendedHeader = new Uint8Array(4);
+      extendedHeader[0] = opCode;                 // 操作码
+      extendedHeader[1] = deviceId === 0x0001 ? 0x00 : status;  // 状态码 (低8位)
+      extendedHeader[2] = (deviceId >> 8) & 0xFF;  // 设备ID高8位
+      extendedHeader[3] = deviceId & 0xFF;         // 设备ID低8位
+      
+      // 当设备ID为0x0001时，payload固定为0x00 0x01 0x00 0x00
+      let fullPayload;
+      if (deviceId === 0x0001) {
+        // 状态码为0x0000 (成功)
+        fullPayload = new Uint8Array([0x00, 0x01, 0x00, 0x00]);
+      } else {
+        // 合并扩展头部和负载数据
+        // 保留4个字节的payload数据: 设备ID(2字节) 和状态码(2字节)
+        const usefulPayloadLength = Math.min(payload.length, 2);
+        const usefulPayload = payload.slice(0, usefulPayloadLength);
+        fullPayload = new Uint8Array(extendedHeader.length + usefulPayloadLength);
+        fullPayload.set(extendedHeader, 0);
+        fullPayload.set(usefulPayload, extendedHeader.length);
+      }
+      
+      // 构建完整帧
+      const frame = new Uint8Array(12 + fullPayload.length);
+      view = new DataView(frame.buffer);
+      
+      view.setUint16(0, MAGIC_ID, false);
+      view.setUint8(4, msgType);         // Message Type at byte 4
+      view.setUint16(5, msgId, false);   // Message ID at bytes 5-6
+      view.setUint8(7, stage);           // Sub Message ID (stage) at byte 7
+      view.setUint16(8, sequence, false);
+      view.setUint16(10, fullPayload.length, false);
+      
+      frame.set(fullPayload, 12);
+      
+      // 计算CRC校验 - 使用整个帧数据，去掉前4个字节
+      const crcData = frame.subarray(4); // 从第4字节开始的所有数据
+      const crc = crc16(crcData);
+      
+      // 设置CRC值
+      view.setUint16(2, crc, false);
+      
+      // 增加sequence值
+      sequence++;
+
+      // 转换为十六进制字符串
+      const hexArray = Array.from(frame).map(b => b.toString(16).padStart(2, '0').toUpperCase());
+      
+      // 按协议帧结构顺序格式化显示
+      let formattedFrame = "";
+      
+      // Magic ID (2字节)
+      formattedFrame += `<div class="frame-section"><span class="frame-label">Magic ID:</span> ${hexArray.slice(0, 2).join(' ')}</div>`;
+      
+      // CRC16 (2字节)
+      formattedFrame += `<div class="frame-section"><span class="frame-label">CRC16:</span> ${hexArray.slice(2, 4).join(' ')}</div>`;
+      
+      // Message Type (1字节)
+      const typeInfo = getMessageTypeInfo(msgType);
+      formattedFrame += `<div class="frame-section"><span class="frame-label">Message Type:</span> ${hexArray.slice(4, 5).join(' ')} (${typeInfo.name})</div>`;
+      
+      // Message ID (2字节)
+      formattedFrame += `<div class="frame-section"><span class="frame-label">Message ID:</span> ${hexArray.slice(5, 7).join(' ')} (${getMessageIdInfo(msgId)})</div>`;
+      
+      // Sub Message ID (1字节)
+      formattedFrame += `<div class="frame-section"><span class="frame-label">Sub Message ID:</span> ${hexArray.slice(7, 8).join(' ')} (${getStageText(stage)})</div>`;
+      
+      // Sequence (2字节)
+      formattedFrame += `<div class="frame-section"><span class="frame-label">Sequence:</span> ${hexArray.slice(8, 10).join(' ')}</div>`;
+      
+      // Length (2字节)
+      formattedFrame += `<div class="frame-section"><span class="frame-label">Length:</span> ${hexArray.slice(10, 12).join(' ')}</div>`;
+      
+      // Payload (剩余字节)
+      const payloadHex = hexArray.slice(12).join(' ');
+      // 解析Payload中的设备ID和状态码
+      let payloadExplanation = '';
+      if (hexArray.length >= 16) {
+        // 设备ID是payload的第1-2字节
+        const deviceIdHex = hexArray.slice(12, 14).join(' ');
+        const deviceId = parseInt(deviceIdHex.replace(' ', ''), 16);
+        // 状态码是payload的第3-4字节
+        const statusCodeHex = hexArray.slice(14, 16).join(' ');
+        const statusCode = parseInt(statusCodeHex.replace(' ', ''), 16);
+        payloadExplanation = ` (设备ID: 0x${deviceId.toString(16).toUpperCase()}, 状态码: 0x${statusCode.toString(16).toUpperCase()} - ${getErrorCodeText(statusCode)})`;
+      }
+      formattedFrame += `<div class="frame-section"><span class="frame-label">Payload:</span> ${payloadHex}${payloadExplanation}</div>`;
+      
+      // 完整帧
+      formattedFrame += `<div class="frame-section"><span class="frame-label">Full Frame:</span> ${hexArray.join(' ')}</div>`;
+      
+      return formattedFrame;
+    }
+
+    function highlightCurrentStep() {
+      document.querySelectorAll('.messageLine0, .messageLine1').forEach(el => {
+        el.style.stroke = '';
+        el.style.strokeWidth = '';
+        el.style.opacity = '0.4';
+      });
+      
+      if (currentStep > 0 && currentStep <= totalSteps) {
+        const messageLines = document.querySelectorAll('.messageLine0, .messageLine1');
+        if (messageLines.length >= currentStep) {
+          const currentLine = messageLines[currentStep - 1];
+          if (currentLine) {
+            currentLine.style.stroke = isErrorState ? '#f5222d' : '#409eff';
+            currentLine.style.strokeWidth = '2px';
+            currentLine.style.opacity = '1';
+            
+            const textElements = document.querySelectorAll('#sequence-diagram text');
+            if (textElements.length > currentStep * 2) {
+              textElements.forEach((text, index) => {
+                text.style.fill = index === currentStep * 2 - 1 ? (isErrorState ? '#f5222d' : '#409eff') : '#333';
+                text.style.fontWeight = index === currentStep * 2 - 1 ? 'bold' : 'normal';
+              });
+            }
+          }
+        }
+      }
+    }
+
+    function updateButtonStates() {
+      document.getElementById('startBtn').disabled = isRunning;
+      document.getElementById('nextBtn').disabled = !isRunning || currentStep >= totalSteps || isErrorState;
+      document.getElementById('resetBtn').disabled = !isRunning;
+      document.getElementById('autoBtn').disabled = !isRunning || isErrorState;
+      document.getElementById('autoBtn').innerHTML = isAutoMode ? 
+        '<i class="fa fa-pause"></i> 暂停' : 
+        '<i class="fa fa-forward"></i> 自动';
+    }
+
+    function updateStepDisplay() {
+      document.getElementById('progressBar').style.width = `${(currentStep / totalSteps) * 100}%`;
+      document.getElementById('currentStepText').textContent = currentStep;
+      
+      if (currentStep >= 1) {
+        document.getElementById('controlRoomStatus').className = 'dot online';
+        document.getElementById('mainCtrlStatus').className = 'dot online';
+      }
+      if (currentStep >= 3) {
+        document.getElementById('armXStatus').className = isErrorState ? 'dot error' : 'dot online';
+      }
+      if (currentStep >= 16) {
+        document.getElementById('targetStatus').className = 'dot online';
+      }
+      
+      highlightCurrentStep();
+      updateButtonStates();
+    }
+
+    function displayCommunicationData() {
+      if (currentStep === 0 || currentStep > steps.length) return;
+      
+      const step = isErrorState ? errorStep : steps[currentStep - 1];
+      const logContainer = document.getElementById('communicationLog');
+      
+      logContainer.innerHTML = '';
+      
+      
+      document.getElementById('statusText').textContent = step.statusText;
+      
+      let sendMsgHtml = '';
+      const typeInfo = getMessageTypeInfo(step.sendType);
+      
+      // 合并状态和错误码为状态码
+      const statusCode = isErrorState ? step.errorCode : step.status;
+      const statusCodeText = getErrorCodeText(statusCode);
+      
+      // 所有步骤都显示完整数据帧内容
+      if (step.sendMsgId !== 0) {
+        // 确保1-4步骤也能显示完整数据帧，即使payload为空
+        const payload = step.sendPayload.length > 0 ? new Uint8Array(step.sendPayload) : new Uint8Array();
+        const frame = buildFrame(
+          step.sendMsgId, 
+          step.sendType, 
+          step.status, 
+          step.stage, 
+          step.errorCode,
+          step.opCode,
+          step.deviceId,
+          payload
+        );
+        
+        // 直接使用buildFrame返回的帧内容
+        let frameContent = frame;
+
+        sendMsgHtml = `
+          <div class="message ${typeInfo.class}">
+            <div class="message-header">
+              <span>${step.sender} → ${step.receiver}</span>
+              <span class="interaction-type">${typeInfo.name}</span>
+            </div>
+            <div class="message-body">
+${step.title.toLowerCase()}
+${frameContent}
+            </div>
+          </div>
+        `;
+      } else {
+        sendMsgHtml = `
+          <div class="message ${typeInfo.class}">
+            <div class="message-header">
+              <span>${step.sender} → ${step.receiver}</span>
+              <span class="interaction-type">${typeInfo.name}</span>
+            </div>
+            <div class="message-body">
+${step.title.toLowerCase()}动作执行中...
+            </div>
+          </div>
+        `;
+      }
+      
+      logContainer.innerHTML += sendMsgHtml;
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+
+    function nextStep() {
+      if (animationTimer) {
+        clearTimeout(animationTimer);
+        animationTimer = null;
+      }
+      
+      // 随机触发错误（30%概率）
+      if (currentStep === 29 && Math.random() > 0.7) {
+        isErrorState = true;
+        displayCommunicationData();
+        updateStepDisplay();
+        return;
+      }
+      
+      if (currentStep < totalSteps && !isErrorState) {
+        currentStep++;
+        updateStepDisplay();
+        displayCommunicationData();
+        
+        if (isAutoMode && currentStep < totalSteps) {
+          animationTimer = setTimeout(nextStep, 2000);
+        }
+      }
+    }
+
+    function startSimulation() {
+      if (!isRunning) {
+        isRunning = true;
+        isErrorState = false;
+        currentStep = 0;
+        sequence = 1;
+        nextStep();
+      }
+    }
+
+    function resetSimulation() {
+      if (animationTimer) {
+        clearTimeout(animationTimer);
+        animationTimer = null;
+      }
+      
+      currentStep = 0;
+      isRunning = false;
+      isAutoMode = false;
+      isErrorState = false;
+      sequence = 1;
+      
+      document.getElementById('progressBar').style.width = '0%';
+      document.getElementById('currentStepText').textContent = '0';
+      document.getElementById('statusText').textContent = '准备就绪，请点击"开始"按钮启动流程';
+      
+      document.getElementById('communicationLog').innerHTML = 
+        '<p style="color: #999; text-align: center; padding: 10px;">等待演示开始...</p>';
+      
+      document.querySelectorAll('.device-indicator .dot').forEach(dot => {
+        dot.className = 'dot';
+      });
+      
+      highlightCurrentStep();
+      updateButtonStates();
+    }
+
+    function toggleAutoMode() {
+      isAutoMode = !isAutoMode;
+      updateButtonStates();
+      
+      if (isAutoMode && currentStep < totalSteps && !isErrorState) {
+        animationTimer = setTimeout(nextStep, 2000);
+      }
+    }
+
+    window.onload = function() {
+      setTimeout(() => {
+        highlightCurrentStep();
+        updateButtonStates();
+      }, 1000);
+    };
+  </script>
+
+
+</body></html>

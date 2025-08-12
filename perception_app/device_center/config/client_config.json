@@ -1,0 +1,79 @@
+{
+    "client": {
+        "service_id": "device_client_001",
+        "service_name": "Device Client",
+        "server_address": "127.0.0.1",
+        "server_port": 9090,
+        "local_port": 9092,
+        "reconnect_interval": 5000,
+        "heartbeat_interval": 5000,
+        "max_reconnect_attempts": 10,
+        "enable_auto_reconnect": true,
+        "log_level": "INFO",
+        "log_file": "logs/device_client.log"
+    },
+    "communication": {
+        "local_service": {
+            "service_id": "device_client_001",
+            "service_name": "Device Client",
+            "version": "1.0.0"
+        },
+        "network": {
+            "local_address": "0.0.0.0",
+            "local_port": 9092,
+            "discovery_port": 9093,
+            "max_connections": 10
+        }
+    },
+    "devices": {
+        "camera_001": {
+            "type": "camera",
+            "config": {
+                "resolution": "1920x1080",
+                "fps": 30,
+                "exposure": "auto",
+                "gain": "auto",
+                "auto_register": true,
+                "auto_heartbeat": true,
+                "heartbeat_interval": 5000
+            }
+        },
+        "sensor_001": {
+            "type": "sensor",
+            "config": {
+                "sampling_rate": 1000,
+                "calibration_enabled": true,
+                "auto_register": true,
+                "auto_heartbeat": true,
+                "heartbeat_interval": 3000
+            }
+        },
+        "robot_001": {
+            "type": "robot",
+            "config": {
+                "max_speed": 100,
+                "safety_enabled": true,
+                "auto_register": true,
+                "auto_heartbeat": true,
+                "heartbeat_interval": 2000
+            }
+        }
+    },
+    "auto_discovery": {
+        "enabled": true,
+        "discovery_interval": 10000,
+        "server_name": "Device Management Server"
+    },
+    "monitoring": {
+        "enable_statistics": true,
+        "statistics_interval": 10000,
+        "enable_health_check": true,
+        "health_check_interval": 30000
+    },
+    "storage": {
+        "enable_data_logging": true,
+        "log_directory": "logs/device_data",
+        "max_log_size": "50MB",
+        "max_log_files": 5
+    }
+}

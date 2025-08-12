@@ -99,7 +99,7 @@ if [[ "$USE_PCL" == "ON" ]]; then
 fi
 
 # 使用绝对路径指向源码目录
-SOURCE_DIR="$SDK_ROOT/samples/cpp/area_scan_3d_camera"
+SOURCE_DIR="$SDK_ROOT/perception_app"
 cmake "$SOURCE_DIR" "${CMAKE_ARGS[@]}"
 
 # 编译

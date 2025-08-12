@@ -1,0 +1,15 @@
+{
+  "linters": {
+    "sample": {
+      "type": "cpplint",
+      "severity": {
+        "build/c++11": "disabled",
+        "build/include_order": "disabled",
+        "runtime/references":"disabled"
+      },
+    "flags":["--root=perception_app", "--linelength=200"],
+      "include": ["(\\.h$)", "(\\.cc$)", "(\\.cpp$)"],
+      "exclude": ["(perception_app/include)"]
+    }
+  }
+}

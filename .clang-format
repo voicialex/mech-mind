@@ -1,0 +1,26 @@
+---
+Language:        Cpp
+BasedOnStyle:  Google
+DerivePointerAlignment: false
+PointerAlignment: Right
+IncludeBlocks: Preserve
+SortIncludes: Never
+# IndentWidth: 2
+# TabWidth: 2
+# UseTab: Never
+# AllowShortIfStatementsOnASingleLine: false
+# AllowShortLoopsOnASingleLine: false
+# AllowShortFunctionsOnASingleLine: Empty
+# AlwaysBreakTemplateDeclarations: Yes
+# BreakBeforeBraces: Allman
+ColumnLimit: 200
+# SpaceAfterCStyleCast: false
+# SpaceBeforeParens: ControlStatements
+# SpaceInEmptyParentheses: false
+# SpacesInCStyleCastParentheses: false
+# SpacesInParentheses: false
+# SpacesInSquareBrackets: false
+# Standard: Auto
+
+...
+

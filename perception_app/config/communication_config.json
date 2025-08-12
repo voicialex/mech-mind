@@ -1,0 +1,72 @@
+{
+    "communication": {
+        "local_service": {
+            "service_id": "perception_app_001",
+            "service_name": "Perception Application",
+            "version": "1.0.0",
+            "capabilities": [
+                "inference_request",
+                "camera_control",
+                "data_processing"
+            ]
+        },
+        "network": {
+            "local_address": "0.0.0.0",
+            "local_port": 8080,
+            "discovery_port": 8081,
+            "max_connections": 50,
+            "buffer_size": 8192,
+            "heartbeat_interval_ms": 5000,
+            "connection_timeout_ms": 30000
+        },
+        "inference_service": {
+            "service_name": "Inference Service",
+            "auto_discovery": true,
+            "preferred_services": [
+                "inference_service_001",
+                "inference_service_002"
+            ],
+            "request_timeout_ms": 10000,
+            "retry_count": 3,
+            "retry_delay_ms": 1000,
+            "auto_reconnect": true
+        },
+        "camera_service": {
+            "service_name": "Camera Service",
+            "auto_discovery": true,
+            "frame_rate": 30,
+            "image_quality": 95,
+            "enable_depth": true,
+            "enable_pointcloud": true
+        },
+        "logging": {
+            "level": "INFO",
+            "enable_network_logs": true,
+            "enable_message_logs": false,
+            "log_file": "communication.log"
+        }
+    },
+    "message_routing": {
+        "default_timeout_ms": 5000,
+        "enable_retry": true,
+        "max_retry_attempts": 3,
+        "retry_delay_ms": 1000,
+        "enable_compression": false,
+        "compression_threshold_bytes": 1024
+    },
+    "security": {
+        "enable_encryption": false,
+        "encryption_key": "",
+        "enable_authentication": false,
+        "allowed_services": [],
+        "blocked_services": []
+    },
+    "performance": {
+        "max_concurrent_requests": 10,
+        "request_queue_size": 100,
+        "enable_connection_pooling": true,
+        "connection_pool_size": 5,
+        "enable_message_caching": false,
+        "cache_size": 1000
+    }
+}
