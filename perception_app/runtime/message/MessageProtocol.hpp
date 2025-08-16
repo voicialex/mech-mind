@@ -100,6 +100,7 @@ public:
      * @return CRC16值
      */
     static uint16_t CalculateCRC16(const std::vector<uint8_t>& data);
+    static uint16_t CalculateCRC16(const uint8_t* data, size_t length);
     
     /**
      * @brief 验证CRC16校验值
@@ -185,6 +186,18 @@ public:
      * @return 参数数据
      */
     std::vector<uint8_t> GetParameters() const;
+    
+    /**
+     * @brief 设置请求数据
+     * @param data 请求数据
+     */
+    void SetRequestData(const std::vector<uint8_t>& data);
+    
+    /**
+     * @brief 获取请求数据
+     * @return 请求数据
+     */
+    std::vector<uint8_t> GetRequestData() const;
     
     std::string ToString() const override;
 };

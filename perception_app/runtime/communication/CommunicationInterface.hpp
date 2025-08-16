@@ -39,6 +39,7 @@ public:
         bool enable_auto_reconnect = true;
         uint32_t max_reconnect_attempts = 5;
         uint32_t reconnect_delay = 1000; // ms
+        bool is_server = false; // 是否为服务器模式
     };
 
 public:
@@ -98,7 +99,7 @@ public:
     bool ConnectToService(const std::string& service_id);
 
     /**
-     * @brief 断开连接
+     * @brief 断开与远程服务的连接
      * @param service_id 服务ID
      */
     void DisconnectFromService(const std::string& service_id);
@@ -112,15 +113,13 @@ public:
     bool SendMessage(const std::string& target_id, const Message::Ptr& message);
 
     /**
-     * @brief 发送消息并等待响应
+     * @brief 发送请求并等待响应
      * @param target_id 目标服务ID
-     * @param message 消息对象
-     * @param timeout_ms 超时时间(毫秒)
+     * @param message 请求消息
+     * @param timeout_ms 超时时间（毫秒）
      * @return 响应消息
      */
-    Message::Ptr SendRequest(const std::string& target_id, 
-                           const Message::Ptr& message,
-                           uint32_t timeout_ms = 5000);
+    Message::Ptr SendRequest(const std::string& target_id, const Message::Ptr& message, uint32_t timeout_ms = 5000);
 
     /**
      * @brief 广播消息
@@ -132,7 +131,7 @@ public:
     /**
      * @brief 发现服务
      * @param service_name 服务名称（可选）
-     * @return 服务列表
+     * @return 发现的服务列表
      */
     std::vector<CommunicationManager::ServiceInfo> DiscoverServices(const std::string& service_name = "");
 
@@ -144,14 +143,14 @@ public:
     bool IsServiceOnline(const std::string& service_id) const;
 
     /**
-     * @brief 获取连接状态
+     * @brief 获取连接信息
      * @param service_id 服务ID
      * @return 连接信息
      */
     CommunicationManager::ConnectionInfo GetConnectionInfo(const std::string& service_id) const;
 
     /**
-     * @brief 获取所有连接
+     * @brief 获取所有连接信息
      * @return 连接信息列表
      */
     std::vector<CommunicationManager::ConnectionInfo> GetAllConnections() const;
@@ -164,7 +163,7 @@ public:
 
     /**
      * @brief 获取统计信息
-     * @return 统计信息JSON
+     * @return 统计信息JSON字符串
      */
     std::string GetStatistics() const;
 
@@ -182,88 +181,22 @@ public:
 
 private:
     // 私有方法
-    void InitializeCommunicationManager();
-    void HandleMessageReceived(const std::string& service_id, const std::vector<uint8_t>& data);
-    void HandleConnectionStatus(const std::string& service_id, bool connected);
-    void HandleError(const std::string& service_id, const asio::error_code& error);
+    void OnMessageReceived(const std::string& service_id, const std::vector<uint8_t>& data);
+    void OnConnectionStatus(const std::string& service_id, bool connected);
+    void OnError(const std::string& service_id, uint16_t error_code);
 
 private:
     Config config_;
+    std::atomic<bool> initialized_{false};
+    std::atomic<bool> running_{false};
+    
+    // 通信管理器
     std::unique_ptr<CommunicationManager> comm_manager_;
     
     // 回调函数
     MessageCallback message_callback_;
     ConnectionCallback connection_callback_;
     ErrorCallback error_callback_;
-    
-    // 状态管理
-    std::atomic<bool> initialized_{false};
-    std::atomic<bool> running_{false};
-    
-    // 消息工厂
-    std::unique_ptr<MessageFactory> message_factory_;
-};
-
-/**
- * @brief 通信接口管理器 - 管理多个通信接口实例
- */
-class CommunicationInterfaceManager {
-public:
-    using Ptr = std::shared_ptr<CommunicationInterfaceManager>;
-    
-    explicit CommunicationInterfaceManager();
-    ~CommunicationInterfaceManager();
-
-    // 禁用拷贝
-    CommunicationInterfaceManager(const CommunicationInterfaceManager&) = delete;
-    CommunicationInterfaceManager& operator=(const CommunicationInterfaceManager&) = delete;
-
-    /**
-     * @brief 创建通信接口
-     * @param name 接口名称
-     * @param config 配置
-     * @return 是否创建成功
-     */
-    bool CreateInterface(const std::string& name, const CommunicationInterface::Config& config);
-
-    /**
-     * @brief 获取通信接口
-     * @param name 接口名称
-     * @return 通信接口指针
-     */
-    std::shared_ptr<CommunicationInterface> GetInterface(const std::string& name);
-
-    /**
-     * @brief 移除通信接口
-     * @param name 接口名称
-     */
-    void RemoveInterface(const std::string& name);
-
-    /**
-     * @brief 启动所有接口
-     * @return 是否全部启动成功
-     */
-    bool StartAll();
-
-    /**
-     * @brief 停止所有接口
-     */
-    void StopAll();
-
-    /**
-     * @brief 获取所有接口状态
-     * @return 接口状态列表
-     */
-    std::vector<std::pair<std::string, bool>> GetAllInterfaceStatus() const;
-
-    /**
-     * @brief 清理所有资源
-     */
-    void Cleanup();
-
-private:
-    std::unordered_map<std::string, std::shared_ptr<CommunicationInterface>> interfaces_;
-    mutable std::mutex interfaces_mutex_;
 };
 
 } // namespace perception

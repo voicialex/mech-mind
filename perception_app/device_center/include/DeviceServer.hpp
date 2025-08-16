@@ -9,6 +9,12 @@
 #include <thread>
 #include <mutex>
 
+// 前向声明
+namespace perception {
+    class Message;
+    class CommunicationInterface;
+}
+
 namespace device_center {
 
 /**
@@ -85,25 +91,10 @@ public:
 
     /**
      * @brief 注册设备处理器
-     * @param device_type 设备类型
      * @param handler 设备处理器
      * @return 是否注册成功
      */
-    bool RegisterDeviceHandler(DeviceType device_type, DeviceHandlerPtr handler);
-
-    /**
-     * @brief 注册设备处理器（按名称）
-     * @param device_type_name 设备类型名称
-     * @param handler 设备处理器
-     * @return 是否注册成功
-     */
-    bool RegisterDeviceHandler(const std::string& device_type_name, DeviceHandlerPtr handler);
-
-    /**
-     * @brief 注销设备处理器
-     * @param device_type 设备类型
-     */
-    void UnregisterDeviceHandler(DeviceType device_type);
+    bool RegisterDeviceHandler(DeviceHandlerPtr handler);
 
     /**
      * @brief 注册事件处理器
@@ -211,12 +202,6 @@ public:
     std::vector<DeviceInfo> GetOnlineDevices() const;
 
     /**
-     * @brief 获取设备类型统计
-     * @return 设备类型统计信息
-     */
-    std::map<DeviceType, uint32_t> GetDeviceTypeStatistics() const;
-
-    /**
      * @brief 检查设备是否在线
      * @param device_id 设备ID
      * @return 是否在线
@@ -275,10 +260,14 @@ private:
     void NotifyDeviceError(const std::string& device_id, 
                           uint16_t error_code, 
                           const std::string& error_message);
-    DeviceHandlerPtr GetDeviceHandler(DeviceType device_type);
     DeviceHandlerPtr GetDeviceHandler(const std::string& device_id);
     bool ValidateDeviceRegistration(const DeviceRegisterRequest& request);
     std::string GenerateDeviceId(const DeviceRegisterRequest& request);
+    
+    // 通信处理方法
+    void HandleDeviceMessage(const std::shared_ptr<perception::Message>& message);
+    void HandleClientConnection(const std::string& service_id, bool connected);
+    void HandleCommunicationError(const std::string& service_id, uint16_t error_code);
 
 private:
     Config config_;
@@ -293,8 +282,7 @@ private:
     mutable std::mutex devices_mutex_;
     
     // 处理器管理
-    std::unordered_map<DeviceType, DeviceHandlerPtr> device_handlers_;
-    std::unordered_map<std::string, DeviceHandlerPtr> device_handlers_by_name_;
+    DeviceHandlerPtr device_handler_;
     std::unordered_map<std::string, CommandCallback> command_callbacks_;
     std::unordered_map<std::string, StatusCallback> status_callbacks_;
     EventHandlerPtr event_handler_;
@@ -302,9 +290,9 @@ private:
     
     // 通信管理
     struct CommunicationDeleter {
-        void operator()(void* ptr) const;
+        void operator()(perception::CommunicationInterface* ptr) const;
     };
-    std::unique_ptr<void, CommunicationDeleter> comm_interface_; // 通信接口（避免直接依赖）
+    std::unique_ptr<perception::CommunicationInterface, CommunicationDeleter> comm_interface_; // 通信接口
     
     // 线程管理
     std::thread heartbeat_thread_;

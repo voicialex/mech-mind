@@ -3,9 +3,8 @@
 #include <chrono>
 #include <thread>
 #include <opencv2/imgcodecs.hpp>
-// #include "area_scan_3d_camera/api_util.h"
 #include "utils/UtilHelper.h"
-#include "ConfigHelper.hpp"
+#include "configure/ConfigHelper.hpp"
 #include "CameraInfo.hpp"
 #include "Logger.hpp"
 #include "InferenceInterface.hpp"

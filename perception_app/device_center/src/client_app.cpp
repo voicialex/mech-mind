@@ -1,4 +1,4 @@
-#include "../include/DeviceClient.hpp"
+#include "DeviceClient.hpp"
 #include <iostream>
 #include <signal.h>
 #include <csignal>
@@ -68,7 +68,7 @@ class ExampleDeviceHandler : public DeviceHandler {
     DeviceInfo info;
     info.device_id = device_id;
     info.device_name = "客户端示例设备";
-    info.device_type = DeviceType::Camera;
+
     info.device_model = "Client-Camera-001";
     info.device_version = "1.0.0";
     info.device_serial = "SN987654321";
@@ -84,7 +84,6 @@ class ExampleDeviceHandler : public DeviceHandler {
     return info;
   }
 
-  std::vector<DeviceType> GetSupportedDeviceTypes() const override { return {DeviceType::Camera, DeviceType::Sensor}; }
 };
 
 // 示例事件处理器
@@ -144,23 +143,46 @@ int main(int argc, char *argv[]) {
       return -1;
     }
 
-    // 发现服务器
+    // 发现服务器（等待一段时间以接收UDP广播）
     std::cout << "正在发现设备服务器..." << std::endl;
-    auto servers = g_client->DiscoverServers("Device Management Server");
+    const int discovery_timeout_ms = 5000;
+    const int discovery_step_ms = 500;
+    int waited_ms = 0;
+    std::vector<std::string> servers;
+    while (g_running && waited_ms < discovery_timeout_ms) {
+      servers = g_client->DiscoverServers("Device Management Server");
+      if (!servers.empty()) {
+        std::cout << "发现服务器: " << servers[0] << std::endl;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(discovery_step_ms));
+      waited_ms += discovery_step_ms;
+    }
     if (servers.empty()) {
-      std::cout << "未发现设备服务器，使用默认配置连接..." << std::endl;
-    } else {
-      std::cout << "发现服务器: " << servers[0] << std::endl;
+      std::cout << "在 " << (discovery_timeout_ms/1000) << " 秒内未发现服务器，将继续后台监听并稍后重试连接" << std::endl;
     }
 
-    // 连接到服务器
+    // 尝试连接到服务器（重试若干次，不因失败直接退出）
     std::cout << "正在连接到设备服务器..." << std::endl;
-    if (!g_client->ConnectToServer()) {
-      std::cerr << "连接服务器失败!" << std::endl;
-      return -1;
+    const int max_connect_attempts = 5;
+    bool connected = false;
+    for (int attempt = 1; g_running && attempt <= max_connect_attempts && !connected; ++attempt) {
+      std::cout << "尝试连接(" << attempt << "/" << max_connect_attempts << ")..." << std::endl;
+      if (g_client->ConnectToServer()) {
+        connected = true;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    if (!connected) {
+      std::cerr << "暂未连接到服务器，客户端将保持运行并继续监听与重试（按 Ctrl+C 退出）" << std::endl;
     }
 
-    std::cout << "设备客户端启动成功!" << std::endl;
+    if (connected) {
+      std::cout << "设备客户端启动成功!" << std::endl;
+    } else {
+      std::cout << "设备客户端已启动（未连接）。等待发现并自动重试..." << std::endl;
+    }
     std::cout << "客户端ID: " << g_client->GetConfig().service_id << std::endl;
     std::cout << "服务器地址: " << g_client->GetConfig().server_address << ":" << g_client->GetConfig().server_port << std::endl;
     std::cout << "按 Ctrl+C 停止客户端" << std::endl;
@@ -174,7 +196,7 @@ int main(int argc, char *argv[]) {
     camera_config["fps"] = 30;
     camera_config["exposure"] = "auto";
 
-    if (g_client->RegisterDevice("camera_001", DeviceType::Camera, camera_config)) {
+    if (g_client->RegisterDevice("camera_001", camera_config)) {
       std::cout << "相机设备注册成功" << std::endl;
 
       // 启用心跳
@@ -186,7 +208,7 @@ int main(int argc, char *argv[]) {
     sensor_config["sampling_rate"] = 1000;
     sensor_config["calibration_enabled"] = true;
 
-    if (g_client->RegisterDevice("sensor_001", DeviceType::Sensor, sensor_config)) {
+    if (g_client->RegisterDevice("sensor_001", sensor_config)) {
       std::cout << "传感器设备注册成功" << std::endl;
 
       // 启用心跳

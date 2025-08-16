@@ -1,4 +1,4 @@
-#include "../include/DeviceServer.hpp"
+#include "DeviceServer.hpp"
 #include <iostream>
 #include <signal.h>
 #include <csignal>
@@ -65,7 +65,7 @@ class ExampleDeviceHandler : public DeviceHandler {
     DeviceInfo info;
     info.device_id = device_id;
     info.device_name = "示例设备";
-    info.device_type = DeviceType::Camera;
+
     info.device_model = "Example-Camera-001";
     info.device_version = "1.0.0";
     info.device_serial = "SN123456789";
@@ -81,7 +81,7 @@ class ExampleDeviceHandler : public DeviceHandler {
     return info;
   }
 
-  std::vector<DeviceType> GetSupportedDeviceTypes() const override { return {DeviceType::Camera, DeviceType::Sensor}; }
+
 };
 
 // 示例事件处理器
@@ -127,8 +127,7 @@ int main(int argc, char *argv[]) {
     // 注册设备处理器
     std::cout << "正在注册设备处理器..." << std::endl;
     auto device_handler = std::make_shared<ExampleDeviceHandler>();
-    g_server->RegisterDeviceHandler(DeviceType::Camera, device_handler);
-    g_server->RegisterDeviceHandler(DeviceType::Sensor, device_handler);
+    g_server->RegisterDeviceHandler(device_handler);
 
     // 注册事件处理器
     auto event_handler = std::make_shared<ExampleEventHandler>();

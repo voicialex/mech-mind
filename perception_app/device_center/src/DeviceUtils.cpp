@@ -1,4 +1,4 @@
-#include "../include/DeviceTypes.hpp"
+#include "DeviceTypes.hpp"
 #include <sstream>
 #include <iomanip>
 #include <chrono>
@@ -31,32 +31,6 @@ DeviceStatus DeviceUtils::StringToStatus(const std::string &status_str) {
   if (status_str == "Error") return DeviceStatus::Error;
   if (status_str == "Maintenance") return DeviceStatus::Maintenance;
   return DeviceStatus::Offline;
-}
-
-std::string DeviceUtils::TypeToString(DeviceType type) {
-  switch (type) {
-    case DeviceType::Camera:
-      return "Camera";
-    case DeviceType::Sensor:
-      return "Sensor";
-    case DeviceType::Robot:
-      return "Robot";
-    case DeviceType::Controller:
-      return "Controller";
-    case DeviceType::Actuator:
-      return "Actuator";
-    default:
-      return "Unknown";
-  }
-}
-
-DeviceType DeviceUtils::StringToType(const std::string &type_str) {
-  if (type_str == "Camera") return DeviceType::Camera;
-  if (type_str == "Sensor") return DeviceType::Sensor;
-  if (type_str == "Robot") return DeviceType::Robot;
-  if (type_str == "Controller") return DeviceType::Controller;
-  if (type_str == "Actuator") return DeviceType::Actuator;
-  return DeviceType::Unknown;
 }
 
 std::string DeviceUtils::CapabilityToString(DeviceCapability capability) {
@@ -94,9 +68,9 @@ DeviceCapability DeviceUtils::StringToCapability(const std::string &capability_s
   return DeviceCapability::Read;
 }
 
-std::string DeviceUtils::GenerateDeviceId(DeviceType device_type, const std::string &device_name) {
+std::string DeviceUtils::GenerateDeviceId(const std::string &device_name) {
   std::ostringstream oss;
-  oss << static_cast<int>(device_type) << "-" << device_name << "-" << GetCurrentTimestamp();
+  oss << device_name << "-" << GetCurrentTimestamp();
   return oss.str();
 }
 

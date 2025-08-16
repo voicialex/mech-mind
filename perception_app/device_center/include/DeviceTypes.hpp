@@ -6,14 +6,6 @@
 #include <memory>
 #include <functional>
 #include <chrono>
-#include <string>
-#include <vector>
-#include <map>
-#include <memory>
-#include <functional>
-#include <chrono>
-
-// 直接包含 nlohmann/json.hpp，因为结构体中需要完整类型
 #include <nlohmann/json.hpp>
 
 namespace device_center {
@@ -27,18 +19,6 @@ enum class DeviceStatus : uint8_t {
     Busy = 0x02,         // 忙碌
     Error = 0x03,        // 错误
     Maintenance = 0x04   // 维护中
-};
-
-/**
- * @brief 设备类型枚举
- */
-enum class DeviceType : uint8_t {
-    Camera = 0x01,       // 相机
-    Sensor = 0x02,       // 传感器
-    Robot = 0x03,        // 机器人
-    Controller = 0x04,   // 控制器
-    Actuator = 0x05,     // 执行器
-    Unknown = 0xFF       // 未知类型
 };
 
 /**
@@ -61,7 +41,6 @@ enum class DeviceCapability : uint8_t {
 struct DeviceInfo {
     std::string device_id;           // 设备ID
     std::string device_name;         // 设备名称
-    DeviceType device_type;          // 设备类型
     std::string device_model;        // 设备型号
     std::string device_version;      // 设备版本
     std::string device_serial;       // 设备序列号
@@ -135,7 +114,6 @@ struct DeviceData {
 struct DeviceRegisterRequest {
     std::string device_id;           // 设备ID
     std::string device_name;         // 设备名称
-    DeviceType device_type;          // 设备类型
     std::string device_model;        // 设备型号
     std::string device_version;      // 设备版本
     std::vector<DeviceCapability> capabilities; // 设备能力
@@ -159,7 +137,6 @@ struct DeviceRegisterResponse {
  */
 struct DeviceDiscoveryRequest {
     std::string client_id;           // 客户端ID
-    DeviceType device_type;          // 设备类型（可选）
     std::string device_name;         // 设备名称（可选）
     bool include_offline;            // 是否包含离线设备
 };
@@ -226,12 +203,6 @@ public:
      * @return 设备信息
      */
     virtual DeviceInfo GetDeviceInfo(const std::string& device_id) = 0;
-    
-    /**
-     * @brief 支持的设备类型
-     * @return 设备类型列表
-     */
-    virtual std::vector<DeviceType> GetSupportedDeviceTypes() const = 0;
 };
 
 /**
@@ -290,20 +261,6 @@ namespace DeviceUtils {
     DeviceStatus StringToStatus(const std::string& status_str);
     
     /**
-     * @brief 设备类型转字符串
-     * @param type 设备类型
-     * @return 类型字符串
-     */
-    std::string TypeToString(DeviceType type);
-    
-    /**
-     * @brief 字符串转设备类型
-     * @param type_str 类型字符串
-     * @return 设备类型
-     */
-    DeviceType StringToType(const std::string& type_str);
-    
-    /**
      * @brief 设备能力转字符串
      * @param capability 设备能力
      * @return 能力字符串
@@ -319,11 +276,10 @@ namespace DeviceUtils {
     
     /**
      * @brief 生成设备ID
-     * @param device_type 设备类型
      * @param device_name 设备名称
      * @return 设备ID
      */
-    std::string GenerateDeviceId(DeviceType device_type, const std::string& device_name);
+    std::string GenerateDeviceId(const std::string& device_name);
     
     /**
      * @brief 验证设备ID格式

@@ -21,7 +21,7 @@
         "network": {
             "local_address": "0.0.0.0",
             "local_port": 9092,
-            "discovery_port": 9093,
+            "discovery_port": 9091,
             "max_connections": 10
         }
     },

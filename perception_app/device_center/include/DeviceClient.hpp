@@ -9,6 +9,12 @@
 #include <thread>
 #include <mutex>
 
+// 前向声明
+namespace perception {
+    class Message;
+    class CommunicationInterface;
+}
+
 namespace device_center {
 
 /**
@@ -38,6 +44,7 @@ public:
         std::string server_address = "127.0.0.1";
         uint16_t server_port = 9090;
         uint16_t local_port = 9092;
+        uint16_t discovery_port = 9091; // 服务器发现端口（应与服务器一致）
         uint32_t reconnect_interval = 5000; // ms
         uint32_t heartbeat_interval = 5000; // ms
         uint32_t max_reconnect_attempts = 10;
@@ -52,7 +59,6 @@ public:
     struct DeviceConfig {
         std::string device_id;
         std::string device_name;
-        DeviceType device_type;
         std::string device_model;
         std::string device_version;
         std::vector<DeviceCapability> capabilities;
@@ -113,13 +119,10 @@ public:
     /**
      * @brief 注册设备
      * @param device_id 设备ID
-     * @param device_type 设备类型
      * @param config 设备配置
      * @return 是否注册成功
      */
-    bool RegisterDevice(const std::string& device_id, 
-                       DeviceType device_type, 
-                       const nlohmann::json& config = {});
+    bool RegisterDevice(const std::string& device_id, const nlohmann::json& config = {});
 
     /**
      * @brief 注册设备（使用设备配置）
@@ -313,9 +316,14 @@ private:
                           uint16_t error_code, 
                           const std::string& error_message);
     DeviceHandlerPtr GetDeviceHandler(const std::string& device_id);
-    bool ValidateDeviceRegistration(const std::string& device_id, DeviceType device_type);
+    bool ValidateDeviceRegistration(const std::string& device_id);
     void AutoReconnect();
     void SendHeartbeat();
+    
+    // 通信处理方法
+    void HandleServerMessage(const std::shared_ptr<perception::Message>& message);
+    void HandleServerConnection(const std::string& service_id, bool connected);
+    void HandleCommunicationError(const std::string& service_id, uint16_t error_code);
 
 private:
     Config config_;
@@ -339,9 +347,9 @@ private:
     
     // 通信管理
     struct CommunicationDeleter {
-        void operator()(void* ptr) const;
+        void operator()(perception::CommunicationInterface* ptr) const;
     };
-    std::unique_ptr<void, CommunicationDeleter> comm_interface_; // 通信接口（避免直接依赖）
+    std::unique_ptr<perception::CommunicationInterface, CommunicationDeleter> comm_interface_; // 通信接口
     std::string connected_server_id_;
     
     // 线程管理

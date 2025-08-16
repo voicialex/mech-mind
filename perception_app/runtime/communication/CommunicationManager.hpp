@@ -10,9 +10,11 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
-#include "../include/Logger.hpp"
+#include "Logger.hpp"
 
 namespace perception {
+
+// 前向声明 - 这些类现在在cpp文件中完整定义
 
 /**
  * @brief 通信管理器 - 基于ASIO的网络通信管理
@@ -48,6 +50,7 @@ public:
         bool enable_auto_reconnect = true;
         uint32_t max_reconnect_attempts = 5;
         uint32_t reconnect_delay = 1000; // ms
+        bool is_server = false; // 是否为服务器模式
     };
 
     /**
@@ -87,20 +90,9 @@ public:
         uint32_t reconnect_attempts;
     };
 
-    /**
-     * @brief 消息传输接口
-     */
-    struct MessageData {
-        std::vector<uint8_t> raw_data;  // 原始消息数据
-        std::string source_id;          // 源服务ID
-        std::string target_id;          // 目标服务ID
-        uint64_t timestamp;             // 时间戳
-        uint16_t sequence;              // 序列号
-    };
-
 public:
     explicit CommunicationManager(const Config& config);
-    CommunicationManager(); // 默认构造函数
+    CommunicationManager();
     ~CommunicationManager();
 
     // 禁用拷贝
@@ -109,6 +101,7 @@ public:
 
     /**
      * @brief 启动通信管理器
+     * @return 是否启动成功
      */
     bool Start();
 
@@ -130,27 +123,27 @@ public:
     void UnregisterService();
 
     /**
-     * @brief 发现远程服务
+     * @brief 发现服务
      * @param service_name 服务名称（可选）
-     * @return 服务列表
+     * @return 发现的服务列表
      */
     std::vector<ServiceInfo> DiscoverServices(const std::string& service_name = "");
 
     /**
-     * @brief 连接到远程服务
+     * @brief 连接到服务
      * @param service_id 服务ID
      * @return 是否连接成功
      */
     bool ConnectToService(const std::string& service_id);
 
     /**
-     * @brief 断开连接
+     * @brief 断开与服务连接
      * @param service_id 服务ID
      */
     void DisconnectFromService(const std::string& service_id);
 
     /**
-     * @brief 发送原始消息数据
+     * @brief 发送消息
      * @param target_id 目标服务ID
      * @param data 消息数据
      * @return 是否发送成功
@@ -158,15 +151,13 @@ public:
     bool SendMessage(const std::string& target_id, const std::vector<uint8_t>& data);
 
     /**
-     * @brief 发送消息并等待响应
+     * @brief 发送请求并等待响应
      * @param target_id 目标服务ID
-     * @param data 消息数据
-     * @param timeout_ms 超时时间(毫秒)
+     * @param data 请求数据
+     * @param timeout_ms 超时时间（毫秒）
      * @return 响应数据
      */
-    std::vector<uint8_t> SendRequest(const std::string& target_id, 
-                                    const std::vector<uint8_t>& data,
-                                    uint32_t timeout_ms = 5000);
+    std::vector<uint8_t> SendRequest(const std::string& target_id, const std::vector<uint8_t>& data, uint32_t timeout_ms = 5000);
 
     /**
      * @brief 广播消息
@@ -176,32 +167,32 @@ public:
     void BroadcastMessage(const std::vector<uint8_t>& data, const std::string& service_name = "");
 
     /**
-     * @brief 注册消息接收处理器
-     * @param handler 处理器函数
+     * @brief 注册消息处理器
+     * @param handler 消息处理回调函数
      */
     void RegisterMessageHandler(MessageHandler handler);
 
     /**
      * @brief 注册连接状态处理器
-     * @param handler 处理器函数
+     * @param handler 连接状态回调函数
      */
     void RegisterConnectionHandler(ConnectionHandler handler);
 
     /**
      * @brief 注册错误处理器
-     * @param handler 处理器函数
+     * @param handler 错误处理回调函数
      */
     void RegisterErrorHandler(ErrorHandler handler);
 
     /**
-     * @brief 获取连接状态
+     * @brief 获取连接信息
      * @param service_id 服务ID
      * @return 连接信息
      */
     ConnectionInfo GetConnectionInfo(const std::string& service_id) const;
 
     /**
-     * @brief 获取所有连接
+     * @brief 获取所有连接信息
      * @return 连接信息列表
      */
     std::vector<ConnectionInfo> GetAllConnections() const;
@@ -221,69 +212,52 @@ public:
 
     /**
      * @brief 获取统计信息
-     * @return 统计信息JSON
+     * @return 统计信息JSON字符串
      */
     std::string GetStatistics() const;
 
-private:
-    // 内部类声明
-    class TcpConnection;
-
-    // 私有方法
-    void RunIOContext();
-    void HandleNewConnection(std::shared_ptr<TcpConnection> connection);
-    void HandleConnectionClosed(const std::string& service_id);
-    void HandleMessageReceived(const std::string& service_id, 
-                             const std::vector<uint8_t>& data);
-    void HandleError(const std::string& service_id, const asio::error_code& error);
-    void StartHeartbeat();
-    void ProcessHeartbeat();
-    void CleanupDeadConnections();
+    /**
+     * @brief 安排重连
+     * @param service_id 服务ID
+     */
     void ScheduleReconnect(const std::string& service_id);
 
 private:
+    // 私有方法
+    void StartDiscoveryService();
+    void StartConnectionManager();
+    void OnServiceDiscovered(const ServiceInfo& service);
+    void OnMessageReceived(const std::string& service_id, const std::vector<uint8_t>& data);
+    void OnConnectionChanged(const std::string& service_id, bool connected);
+    void OnConnectionError(const std::string& service_id, const asio::error_code& ec);
+    void OnBroadcastMessageReceived(const std::vector<uint8_t>& data);
+
+private:
     Config config_;
-    std::unique_ptr<asio::io_context> io_context_;
-    std::unique_ptr<asio::ip::tcp::acceptor> acceptor_;
-    // 简化：暂时不使用这些组件，避免前向声明问题
-    // std::unique_ptr<void, DiscoveryDeleter> discovery_;
-    // std::unique_ptr<void, MessageProcessorDeleter> message_processor_;
+    std::atomic<bool> running_{false};
+    
+    // ASIO相关
+    std::shared_ptr<asio::io_context> io_context_;
+    asio::executor_work_guard<asio::io_context::executor_type> work_guard_;
+    std::thread io_thread_;
     
     // 服务管理
-    ServiceInfo local_service_;
+    ServiceInfo local_service_info_;
     std::unordered_map<std::string, ServiceInfo> discovered_services_;
     mutable std::mutex services_mutex_;
     
     // 连接管理
-    std::unordered_map<std::string, std::shared_ptr<TcpConnection>> connections_;
+    std::unordered_map<std::string, ConnectionInfo> connections_;
     mutable std::mutex connections_mutex_;
     
-    // 消息处理
+    // 回调函数
     MessageHandler message_handler_;
-    std::unordered_map<uint16_t, std::promise<std::vector<uint8_t>>> pending_requests_;
-    mutable std::mutex handlers_mutex_;
-    
-    // 回调处理器
     ConnectionHandler connection_handler_;
     ErrorHandler error_handler_;
     
-    // 线程管理
-    std::thread io_thread_;
-    std::thread heartbeat_thread_;
-    std::atomic<bool> running_{false};
-    std::atomic<uint16_t> sequence_counter_{1};
-    
-    // 定时器
-    std::unique_ptr<asio::steady_timer> heartbeat_timer_;
-    std::unique_ptr<asio::steady_timer> cleanup_timer_;
-    std::unique_ptr<asio::steady_timer> reconnect_timer_;
-    
-    // 统计信息
-    mutable std::mutex stats_mutex_;
-    uint32_t total_messages_sent_{0};
-    uint32_t total_messages_received_{0};
-    uint32_t total_connections_{0};
-    uint32_t total_errors_{0};
+    // 服务组件 - 使用void*避免前向声明问题
+    std::unique_ptr<void, std::function<void(void*)>> discovery_service_;
+    std::unique_ptr<void, std::function<void(void*)>> connection_manager_;
 };
 
 } // namespace perception

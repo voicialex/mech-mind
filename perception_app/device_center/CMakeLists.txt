@@ -7,11 +7,6 @@ project(DeviceCenter VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 设置编译选项
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-
 # 功能开关选项
 option(BUILD_DEVICE_CENTER "Build Device Center module" ON)
 option(BUILD_DEVICE_SERVER "Build Device Server application" ON)
@@ -28,13 +23,17 @@ message(STATUS "Building Device Center module...")
 # 线程库
 find_package(Threads REQUIRED)
 
-# 设置包含目录
+# 设置包含目录（自动继承上层的include_directories设置）
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../communication
-    ${CMAKE_CURRENT_SOURCE_DIR}/../message
+    ${CMAKE_CURRENT_SOURCE_DIR}/include  # 只需要添加自己的特定路径
 )
+
+# 获取父目录的MechEyeApi库路径
+if(DEFINED MECHEYEAPI_LIBRARY_DIRS)
+    set(DEVICE_CENTER_MECHEYEAPI_LIBRARY_DIRS ${MECHEYEAPI_LIBRARY_DIRS})
+else()
+    set(DEVICE_CENTER_MECHEYEAPI_LIBRARY_DIRS "/home/seb/workspace/oss/mech-mind/lib")
+endif()
 
 # 源文件
 set(DEVICE_CENTER_SOURCES
@@ -61,9 +60,10 @@ set_target_properties(device_center PROPERTIES
     PUBLIC_HEADER include/DeviceServer.hpp include/DeviceClient.hpp include/DeviceTypes.hpp
 )
 
-# 链接库（仅链接必要的库）
+# 链接库
 target_link_libraries(device_center
     Threads::Threads
+    perception_app_lib
 )
 
 # 设置编译定义
@@ -78,12 +78,20 @@ if(BUILD_DEVICE_SERVER)
     # 链接库
     target_link_libraries(device_server
         device_center
+        perception_app_lib
         Threads::Threads
     )
     
     # 设置编译定义
     target_compile_definitions(device_server PRIVATE
         BUILD_DEVICE_SERVER
+    )
+    
+    # 设置RPATH
+    set_target_properties(device_server PROPERTIES
+        INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib;${DEVICE_CENTER_MECHEYEAPI_LIBRARY_DIRS}"
+        BUILD_WITH_INSTALL_RPATH FALSE
+        SKIP_BUILD_RPATH FALSE
     )
 endif()
 
@@ -94,12 +102,20 @@ if(BUILD_DEVICE_CLIENT)
     # 链接库
     target_link_libraries(device_client
         device_center
+        perception_app_lib
         Threads::Threads
     )
     
     # 设置编译定义
     target_compile_definitions(device_client PRIVATE
         BUILD_DEVICE_CLIENT
+    )
+    
+    # 设置RPATH
+    set_target_properties(device_client PROPERTIES
+        INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib;${DEVICE_CENTER_MECHEYEAPI_LIBRARY_DIRS}"
+        BUILD_WITH_INSTALL_RPATH FALSE
+        SKIP_BUILD_RPATH FALSE
     )
 endif()
 

@@ -29,14 +29,14 @@ echo "Halcon 支持: $ENABLE_HALCON"
 echo "构建类型: $BUILD_TYPE"
 
 # 检查必要文件
-if [ ! -f "$SDK_ROOT/lib/pkgconfig/MechEyeApi.pc" ]; then
+if [ ! -f "$SDK_ROOT/thirdparty/lib/pkgconfig/MechEyeApi.pc" ]; then
     echo "错误: 找不到 MechEyeApi.pc 文件"
     exit 1
 fi
 
 # 设置环境变量
-export PKG_CONFIG_PATH="$SDK_ROOT/lib/pkgconfig:$PKG_CONFIG_PATH"
-export LD_LIBRARY_PATH="$SDK_ROOT/lib:$LD_LIBRARY_PATH"
+export PKG_CONFIG_PATH="$SDK_ROOT/thirdparty/lib/pkgconfig:$PKG_CONFIG_PATH"
+export LD_LIBRARY_PATH="$SDK_ROOT/thirdparty/lib:$LD_LIBRARY_PATH"
 
 # 验证 MechEyeApi
 echo "验证 MechEyeApi..."

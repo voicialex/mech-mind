@@ -1,4 +1,6 @@
-#include "../include/DeviceClient.hpp"
+#include "DeviceClient.hpp"
+#include "communication/CommunicationInterface.hpp"
+#include "message/PerceptionMessages.hpp"
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <fstream>
@@ -19,10 +21,8 @@ DeviceClient::DeviceClient() : config_() {}  // 默认构造函数使用默认�
 DeviceClient::~DeviceClient() { Stop(); }
 
 // 实现通信删除器
-void DeviceClient::CommunicationDeleter::operator()(void *ptr) const {
+void DeviceClient::CommunicationDeleter::operator()(perception::CommunicationInterface* ptr) const {
   if (ptr) {
-    // 在实际应用中，这里应该进行正确的类型转换
-    // 例如：delete static_cast<perception::CommunicationInterface*>(ptr);
     delete ptr;
   }
 }
@@ -38,11 +38,36 @@ bool DeviceClient::Initialize(const std::string &config_path) {
 
 bool DeviceClient::ConnectToServer(const std::string & /*server_id*/) {
   if (!initialized_) return false;
-  connected_ = true;  // 简化：直接标记为已连接
-  return true;
+  
+  // 使用ASIO通信层连接服务器
+  try {
+    if (comm_interface_) {
+      // 发现服务器
+      auto services = comm_interface_->DiscoverServices("Device Management Server");
+      if (!services.empty()) {
+        // 连接到第一个发现的服务器
+        const auto& server = services[0];
+        if (comm_interface_->ConnectToService(server.service_id)) {
+          connected_ = true;
+          connected_server_id_ = server.service_id;
+          std::cout << "成功连接到服务器: " << server.service_id << std::endl;
+          return true;
+        }
+      }
+    }
+  } catch (const std::exception& e) {
+    std::cerr << "连接服务器异常: " << e.what() << std::endl;
+  }
+  
+  return false;
 }
 
-void DeviceClient::DisconnectFromServer() { connected_ = false; }
+void DeviceClient::DisconnectFromServer() { 
+  if (comm_interface_) {
+    comm_interface_->DisconnectFromService(connected_server_id_);
+  }
+  connected_ = false; 
+}
 
 bool DeviceClient::Start() {
   if (!initialized_) return false;
@@ -70,12 +95,11 @@ void DeviceClient::Cleanup() {
   device_heartbeat_enabled_.clear();
 }
 
-bool DeviceClient::RegisterDevice(const std::string &device_id, DeviceType device_type, const nlohmann::json &config) {
+bool DeviceClient::RegisterDevice(const std::string &device_id, const nlohmann::json &config) {
   // 先本地注册
   DeviceConfig dc;
   dc.device_id = device_id;
   dc.device_name = device_id;
-  dc.device_type = device_type;
   dc.config = config;
   bool local_success = RegisterDevice(dc);
 
@@ -84,16 +108,27 @@ bool DeviceClient::RegisterDevice(const std::string &device_id, DeviceType devic
     DeviceRegisterRequest request;
     request.device_id = device_id;
     request.device_name = device_id;
-    request.device_type = device_type;
     request.client_id = config_.service_id;
     request.capabilities = {DeviceCapability::Capture, DeviceCapability::Configure, DeviceCapability::Status};
 
-    // 模拟向服务器发送注册请求
-    std::cout << "向服务器注册设备: " << device_id << std::endl;
-
-    // 这里应该通过通信接口发送请求到服务器
-    // 简化实现：直接模拟成功
-    return true;
+    // 通过通信接口发送注册请求
+    if (comm_interface_) {
+      try {
+        // 创建注册消息
+        auto message = std::make_shared<perception::Message>();
+        message->SetMessageId(perception::MessageIds::PERCEPTION_START);
+        // 简化实现：直接发送请求数据
+        std::vector<uint8_t> request_data;
+        // 这里应该序列化request，简化实现
+        
+        if (comm_interface_->SendMessage(connected_server_id_, message)) {
+          std::cout << "向服务器注册设备: " << device_id << std::endl;
+          return true;
+        }
+      } catch (const std::exception& e) {
+        std::cerr << "注册设备到服务器失败: " << e.what() << std::endl;
+      }
+    }
   }
 
   return local_success;
@@ -104,7 +139,7 @@ bool DeviceClient::RegisterDevice(const DeviceConfig &device_config) {
   DeviceInfo info{};
   info.device_id = device_config.device_id;
   info.device_name = device_config.device_name;
-  info.device_type = device_config.device_type;
+
   info.device_model = device_config.device_model;
   info.device_version = device_config.device_version;
   info.status = DeviceStatus::Online;
@@ -132,6 +167,22 @@ bool DeviceClient::ReportDeviceStatus(const std::string &device_id, const Device
   std::lock_guard<std::mutex> lk(devices_mutex_);
   device_status_[device_id] = status;
   ++total_status_reports_;
+  
+  // 如果已连接服务器，上报状态
+  if (connected_ && comm_interface_) {
+    try {
+      auto message = std::make_shared<perception::Message>();
+      message->SetMessageId(perception::MessageIds::PERCEPTION_STATUS);
+              // 简化实现：直接发送状态数据
+        std::vector<uint8_t> status_data;
+        // 这里应该序列化status，简化实现
+      
+      comm_interface_->SendMessage(connected_server_id_, message);
+    } catch (const std::exception& e) {
+      std::cerr << "上报设备状态失败: " << e.what() << std::endl;
+    }
+  }
+  
   return true;
 }
 
@@ -169,8 +220,20 @@ bool DeviceClient::RegisterStatusCallback(const std::string &device_id, StatusCa
 }
 
 std::vector<std::string> DeviceClient::DiscoverServers(const std::string & /*server_name*/) {
-  // 简化：返回空或本地
-  return {"local"};
+  // 使用ASIO通信层发现服务器
+  if (comm_interface_) {
+    try {
+      auto services = comm_interface_->DiscoverServices("Device Management Server");
+      std::vector<std::string> server_list;
+      for (const auto& service : services) {
+        server_list.push_back(service.service_id);
+      }
+      return server_list;
+    } catch (const std::exception& e) {
+      std::cerr << "发现服务器失败: " << e.what() << std::endl;
+    }
+  }
+  return {};
 }
 
 std::vector<DeviceInfo> DeviceClient::GetRegisteredDevices() const {
@@ -209,6 +272,7 @@ bool DeviceClient::IsConnectedToServer() const { return connected_; }
 nlohmann::json DeviceClient::GetConnectionStatus() const {
   nlohmann::json status_json;
   status_json["connected"] = connected_.load();
+  status_json["server_id"] = connected_server_id_;
   return status_json;
 }
 
@@ -270,13 +334,64 @@ void DeviceClient::LoadConfig(const std::string &config_path) {
       if (client_config.contains("service_name")) config_.service_name = client_config["service_name"].get<std::string>();
       if (client_config.contains("server_address")) config_.server_address = client_config["server_address"].get<std::string>();
       if (client_config.contains("server_port")) config_.server_port = client_config["server_port"].get<uint16_t>();
+      if (client_config.contains("local_port")) config_.local_port = client_config["local_port"].get<uint16_t>();
     }
-  } catch (...) {
+    
+    // 从communication.network部分读取discovery_port
+    if (config_json.contains("communication") && 
+        config_json["communication"].contains("network")) {
+      const auto &network_config = config_json["communication"]["network"];
+      if (network_config.contains("discovery_port")) {
+        config_.discovery_port = network_config["discovery_port"].get<uint16_t>();
+      }
+    }
+    
+    std::cout << "[CONFIG] 客户端配置加载完成:" << std::endl;
+    std::cout << "  service_id: " << config_.service_id << std::endl;
+    std::cout << "  local_port: " << config_.local_port << std::endl;
+    std::cout << "  discovery_port: " << config_.discovery_port << std::endl;
+    std::cout << "  server_port: " << config_.server_port << std::endl;
+  } catch (const std::exception& e) {
+    std::cerr << "加载配置文件失败: " << e.what() << std::endl;
   }
 }
 
 void DeviceClient::InitializeCommunication() {
-  // 简化：与通信层解耦，占位
+  // 使用ASIO通信层
+  try {
+    perception::CommunicationInterface::Config comm_config;
+    comm_config.local_service_id = config_.service_id;
+    comm_config.local_service_name = config_.service_name;
+    comm_config.local_address = "0.0.0.0";
+    comm_config.local_port = config_.local_port;
+    comm_config.discovery_port = config_.discovery_port;
+    comm_config.is_server = false; // 客户端模式
+    
+    auto comm_interface = new perception::CommunicationInterface(comm_config);
+    
+    // 注册消息回调
+    comm_interface->RegisterMessageCallback([this](const std::shared_ptr<perception::Message>& message) {
+      HandleServerMessage(message);
+    });
+    
+    comm_interface->RegisterConnectionCallback([this](const std::string& service_id, bool connected) {
+      HandleServerConnection(service_id, connected);
+    });
+    
+    comm_interface->RegisterErrorCallback([this](const std::string& service_id, uint16_t error_code) {
+      HandleCommunicationError(service_id, error_code);
+    });
+    
+          if (comm_interface->Initialize() && comm_interface->Start()) {
+        comm_interface_.reset(comm_interface);
+        std::cout << "通信接口初始化成功" << std::endl;
+      } else {
+        delete comm_interface;
+        std::cerr << "通信接口初始化失败" << std::endl;
+      }
+  } catch (const std::exception& e) {
+    std::cerr << "初始化通信接口异常: " << e.what() << std::endl;
+  }
 }
 
 void DeviceClient::StartHeartbeat() {
@@ -312,7 +427,6 @@ void DeviceClient::ProcessHeartbeat() {
   }
 }
 
-void DeviceClient::HandleServerMessage(const std::vector<uint8_t> &) {}
 void DeviceClient::HandleDeviceRegistration(const DeviceRegisterRequest &) {}
 void DeviceClient::HandleDeviceDiscovery(const DeviceDiscoveryRequest &) {}
 void DeviceClient::HandleDeviceControl(const DeviceControlRequest &) {}
@@ -337,7 +451,7 @@ DeviceClient::DeviceHandlerPtr DeviceClient::GetDeviceHandler(const std::string 
   return nullptr;
 }
 
-bool DeviceClient::ValidateDeviceRegistration(const std::string &device_id, DeviceType /*device_type*/) { return !device_id.empty(); }
+bool DeviceClient::ValidateDeviceRegistration(const std::string &device_id) { return !device_id.empty(); }
 
 void DeviceClient::AutoReconnect() {
   // 简化：省略
@@ -345,4 +459,37 @@ void DeviceClient::AutoReconnect() {
 
 void DeviceClient::SendHeartbeat() {
   // 简化：省略
+}
+
+// 新增的通信处理方法
+void DeviceClient::HandleServerMessage(const std::shared_ptr<perception::Message>& message) {
+  // 处理来自服务器的消息
+  if (!message) return;
+  
+  try {
+    // 根据消息类型处理不同的服务器命令
+    std::cout << "收到服务器消息: " << message->GetMessageId() << std::endl;
+    
+    // 这里需要根据具体的消息协议来实现设备命令处理
+    // 例如：设备控制、状态查询等
+  } catch (const std::exception& e) {
+    std::cerr << "处理服务器消息异常: " << e.what() << std::endl;
+  }
+}
+
+void DeviceClient::HandleServerConnection(const std::string& service_id, bool connected) {
+  std::cout << "服务器连接状态变化: " << service_id << " " << (connected ? "已连接" : "已断开") << std::endl;
+  
+  if (connected) {
+    connected_ = true;
+    connected_server_id_ = service_id;
+  } else {
+    connected_ = false;
+    connected_server_id_.clear();
+  }
+}
+
+void DeviceClient::HandleCommunicationError(const std::string& service_id, uint16_t error_code) {
+  std::cerr << "通信错误: " << service_id << " 错误码: " << error_code << std::endl;
+  ++total_errors_;
 }

@@ -1,5 +1,6 @@
 # 编译输出目录
 ./output/
+output
 build/
 build_*/
 dumps/
