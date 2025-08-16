@@ -4,6 +4,7 @@ output
 build/
 build_*/
 dumps/
+thirdparty
 
 # CMake 生成的文件
 CMakeCache.txt

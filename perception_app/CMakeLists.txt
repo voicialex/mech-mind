@@ -47,6 +47,20 @@ endif()
 
 # 查找 PCL
 if(USE_PCL)
+    # 首先查找 MPI，解决 VTK 的 MPI 依赖问题
+    # 启用 C 语言支持以查找 MPI_C
+    enable_language(C)
+    find_package(MPI REQUIRED)
+    if(MPI_FOUND)
+        message(STATUS "MPI found: ${MPI_CXX_LIBRARIES}")
+        message(STATUS "MPI include dirs: ${MPI_CXX_INCLUDE_DIRS}")
+        message(STATUS "MPI C libraries: ${MPI_C_LIBRARIES}")
+    endif()
+    
+    # 设置 VTK 的 MPI 配置
+    set(VTK_USE_MPI ON)
+    set(VTK_MPI_NUMPROCS 1)
+    
     find_package(PCL REQUIRED)
     if(NOT PCL_FOUND)
         message(FATAL_ERROR "PCL not found. Please install PCL first.")
@@ -176,6 +190,10 @@ if(USE_OPENCV)
 endif()
 
 if(USE_PCL)
+    # 添加 MPI 库
+    if(MPI_FOUND)
+        list(APPEND TARGET_LIBRARIES ${MPI_CXX_LIBRARIES})
+    endif()
     list(APPEND TARGET_LIBRARIES ${PCL_LIBRARIES})
 endif()
 

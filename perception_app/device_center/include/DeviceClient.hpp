@@ -1,56 +1,34 @@
 #pragma once
 
-#include "DeviceTypes.hpp"
+#include "DeviceManager.hpp"
 #include <memory>
 #include <functional>
 #include <string>
-#include <unordered_map>
-#include <atomic>
-#include <thread>
-#include <mutex>
-
-// 前向声明
-namespace perception {
-    class Message;
-    class CommunicationInterface;
-}
+#include <vector>
 
 namespace device_center {
 
 /**
  * @brief 设备客户端 - 连接设备服务器并管理本地设备
  * 
- * 功能特性：
- * - 连接设备服务器
- * - 设备注册和注销
- * - 设备状态上报
- * - 设备控制响应
- * - 设备数据上传
- * - 自动重连机制
+ * 优化后的功能特性：
+ * - 继承自DeviceManager，复用通用功能
+ * - 专注于客户端特有的业务逻辑
+ * - 简化的接口设计
+ * - 统一的事件处理机制
  */
-class DeviceClient {
+class DeviceClient : public DeviceManager {
 public:
-    using DeviceHandlerPtr = DeviceHandler::Ptr;
-    using EventHandlerPtr = DeviceEventHandler::Ptr;
-    using CommandCallback = std::function<DeviceResponse(const DeviceCommand&)>;
-    using StatusCallback = std::function<void(const DeviceStatusInfo&)>;
-
     /**
      * @brief 客户端配置
      */
-    struct Config {
-        std::string service_id = "device_client_001";
-        std::string service_name = "Device Client";
+    struct ClientConfig : public Config {
         std::string server_address = "127.0.0.1";
         uint16_t server_port = 9090;
-        uint16_t local_port = 9092;
-        uint16_t discovery_port = 9091; // 服务器发现端口（应与服务器一致）
         uint32_t reconnect_interval = 5000; // ms
-        uint32_t heartbeat_interval = 5000; // ms
         uint32_t max_reconnect_attempts = 10;
         bool enable_auto_reconnect = true;
-        std::string log_level = "INFO";
-        std::string log_file = "device_client.log";
+        bool enable_auto_discovery = true;
     };
 
     /**
@@ -68,24 +46,20 @@ public:
     };
 
 public:
-    explicit DeviceClient(const Config& config);
+    explicit DeviceClient(const ClientConfig& config);
     DeviceClient(); // 默认构造函数
-    ~DeviceClient();
-
-    // 禁用拷贝
-    DeviceClient(const DeviceClient&) = delete;
-    DeviceClient& operator=(const DeviceClient&) = delete;
+    ~DeviceClient() override;
 
     /**
      * @brief 初始化设备客户端
      * @param config_path 配置文件路径
      * @return 是否初始化成功
      */
-    bool Initialize(const std::string& config_path = "");
+    bool Initialize(const std::string& config_path = "") override;
 
     /**
      * @brief 连接到设备服务器
-     * @param server_id 服务器ID
+     * @param server_id 服务器ID（可选，为空则自动发现）
      * @return 是否连接成功
      */
     bool ConnectToServer(const std::string& server_id = "");
@@ -96,28 +70,7 @@ public:
     void DisconnectFromServer();
 
     /**
-     * @brief 启动客户端
-     * @return 是否启动成功
-     */
-    bool Start();
-
-    /**
-     * @brief 停止客户端
-     */
-    void Stop();
-
-    /**
-     * @brief 运行客户端循环
-     */
-    void Run();
-
-    /**
-     * @brief 清理资源
-     */
-    void Cleanup();
-
-    /**
-     * @brief 注册设备
+     * @brief 注册设备（客户端版本）
      * @param device_id 设备ID
      * @param config 设备配置
      * @return 是否注册成功
@@ -130,13 +83,6 @@ public:
      * @return 是否注册成功
      */
     bool RegisterDevice(const DeviceConfig& device_config);
-
-    /**
-     * @brief 注销设备
-     * @param device_id 设备ID
-     * @return 是否注销成功
-     */
-    bool UnregisterDevice(const std::string& device_id);
 
     /**
      * @brief 上报设备状态
@@ -165,68 +111,11 @@ public:
                          const DeviceResponse& response);
 
     /**
-     * @brief 注册设备处理器
-     * @param device_id 设备ID
-     * @param handler 设备处理器
-     * @return 是否注册成功
-     */
-    bool RegisterDeviceHandler(const std::string& device_id, DeviceHandlerPtr handler);
-
-    /**
-     * @brief 注册事件处理器
-     * @param handler 事件处理器
-     */
-    void RegisterEventHandler(EventHandlerPtr handler);
-
-    /**
-     * @brief 注册命令回调
-     * @param device_id 设备ID
-     * @param callback 命令回调函数
-     * @return 是否注册成功
-     */
-    bool RegisterCommandCallback(const std::string& device_id, CommandCallback callback);
-
-    /**
-     * @brief 注册状态回调
-     * @param device_id 设备ID
-     * @param callback 状态回调函数
-     * @return 是否注册成功
-     */
-    bool RegisterStatusCallback(const std::string& device_id, StatusCallback callback);
-
-    /**
      * @brief 发现服务器
      * @param server_name 服务器名称（可选）
      * @return 服务器列表
      */
     std::vector<std::string> DiscoverServers(const std::string& server_name = "");
-
-    /**
-     * @brief 获取已注册的设备
-     * @return 设备列表
-     */
-    std::vector<DeviceInfo> GetRegisteredDevices() const;
-
-    /**
-     * @brief 获取设备信息
-     * @param device_id 设备ID
-     * @return 设备信息
-     */
-    DeviceInfo GetDeviceInfo(const std::string& device_id) const;
-
-    /**
-     * @brief 获取设备状态
-     * @param device_id 设备ID
-     * @return 设备状态
-     */
-    DeviceStatusInfo GetDeviceStatus(const std::string& device_id) const;
-
-    /**
-     * @brief 检查设备是否已注册
-     * @param device_id 设备ID
-     * @return 是否已注册
-     */
-    bool IsDeviceRegistered(const std::string& device_id) const;
 
     /**
      * @brief 检查是否连接到服务器
@@ -250,19 +139,7 @@ public:
      * @brief 获取客户端配置
      * @return 客户端配置
      */
-    Config GetConfig() const;
-
-    /**
-     * @brief 检查客户端是否运行
-     * @return 是否运行
-     */
-    bool IsRunning() const;
-
-    /**
-     * @brief 检查客户端是否已初始化
-     * @return 是否已初始化
-     */
-    bool IsInitialized() const;
+    const ClientConfig& GetClientConfig() const { return client_config_; }
 
     /**
      * @brief 设置设备配置
@@ -294,83 +171,46 @@ public:
      */
     bool DisableDeviceHeartbeat(const std::string& device_id);
 
+protected:
+    // 实现DeviceManager的虚函数
+    void HandleDeviceMessage(const DeviceCommunicationAdapter::DeviceMessage& message) override;
+    void HandleConnectionStateChanged(const std::string& service_id, 
+                                   DeviceCommunicationAdapter::ConnectionState state) override;
+    void HandleCommunicationError(const std::string& service_id, uint16_t error_code) override;
+
 private:
-    // 私有方法
-    void LoadConfig(const std::string& config_path);
-    void InitializeCommunication();
-    void StartHeartbeat();
-    void StopHeartbeat();
-    void ProcessHeartbeat();
-    void HandleServerMessage(const std::vector<uint8_t>& message_data);
-    void HandleDeviceRegistration(const DeviceRegisterRequest& request);
-    void HandleDeviceDiscovery(const DeviceDiscoveryRequest& request);
-    void HandleDeviceControl(const DeviceControlRequest& request);
-    void HandleDeviceCommand(const DeviceCommand& command);
-    void HandleDeviceStatusUpdate(const std::string& device_id, const DeviceStatusInfo& status);
-    void HandleDeviceData(const DeviceData& device_data);
-    void NotifyDeviceStatusChanged(const std::string& device_id, 
-                                 DeviceStatus old_status, 
-                                 DeviceStatus new_status);
-    void NotifyDeviceDataReceived(const DeviceData& device_data);
-    void NotifyDeviceError(const std::string& device_id, 
-                          uint16_t error_code, 
-                          const std::string& error_message);
-    DeviceHandlerPtr GetDeviceHandler(const std::string& device_id);
-    bool ValidateDeviceRegistration(const std::string& device_id);
+    // 客户端特有的私有方法
+    void HandleServerCommand(const DeviceCommand& command);
+    void HandleServerStatusRequest(const std::string& device_id);
+    void HandleServerDataRequest(const std::string& device_id);
     void AutoReconnect();
     void SendHeartbeat();
     
-    // 通信处理方法
-    void HandleServerMessage(const std::shared_ptr<perception::Message>& message);
-    void HandleServerConnection(const std::string& service_id, bool connected);
-    void HandleCommunicationError(const std::string& service_id, uint16_t error_code);
+    // 工具方法
+    bool ValidateDeviceRegistration(const std::string& device_id);
+    void UpdateConnectionStatus(bool connected, const std::string& server_id = "");
 
 private:
-    Config config_;
-    std::atomic<bool> initialized_{false};
-    std::atomic<bool> running_{false};
+    // 客户端特有的成员变量
+    ClientConfig client_config_;
+    
+    // 连接状态
     std::atomic<bool> connected_{false};
-    
-    // 设备管理
-    std::unordered_map<std::string, DeviceInfo> registered_devices_;
-    std::unordered_map<std::string, DeviceStatusInfo> device_status_;
-    std::unordered_map<std::string, DeviceConfig> device_configs_;
-    std::unordered_map<std::string, bool> device_heartbeat_enabled_;
-    mutable std::mutex devices_mutex_;
-    
-    // 处理器管理
-    std::unordered_map<std::string, DeviceHandlerPtr> device_handlers_;
-    std::unordered_map<std::string, CommandCallback> command_callbacks_;
-    std::unordered_map<std::string, StatusCallback> status_callbacks_;
-    EventHandlerPtr event_handler_;
-    mutable std::mutex handlers_mutex_;
-    
-    // 通信管理
-    struct CommunicationDeleter {
-        void operator()(perception::CommunicationInterface* ptr) const;
-    };
-    std::unique_ptr<perception::CommunicationInterface, CommunicationDeleter> comm_interface_; // 通信接口
     std::string connected_server_id_;
     
-    // 线程管理
-    std::thread heartbeat_thread_;
-    std::thread reconnect_thread_;
-    std::atomic<bool> heartbeat_running_{false};
-    std::atomic<bool> reconnect_running_{false};
+    // 设备配置管理
+    std::unordered_map<std::string, DeviceConfig> device_configs_;
+    std::unordered_map<std::string, bool> device_heartbeat_enabled_;
+    mutable std::mutex device_configs_mutex_;
     
     // 重连管理
     std::atomic<uint32_t> reconnect_attempts_{0};
     std::atomic<uint64_t> last_reconnect_time_{0};
     
-    // 统计信息
-    mutable std::mutex stats_mutex_;
-    uint32_t total_devices_registered_{0};
-    uint32_t total_status_reports_{0};
-    uint32_t total_data_reports_{0};
-    uint32_t total_commands_processed_{0};
-    uint32_t total_errors_{0};
-    uint64_t client_start_time_{0};
-    uint64_t last_heartbeat_time_{0};
+    // 客户端统计
+    std::atomic<uint32_t> total_status_reports_{0};
+    std::atomic<uint32_t> total_data_reports_{0};
+    std::atomic<uint32_t> total_commands_processed_{0};
 };
 
 } // namespace device_center

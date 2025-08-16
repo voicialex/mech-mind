@@ -20,11 +20,28 @@ void SignalHandler(int signal) {
   }
 }
 
-// 示例设备处理器
-class ExampleDeviceHandler : public DeviceHandler {
+// 统一的设备事件处理器
+class UnifiedDeviceEventHandler : public DeviceEventHandler {
  public:
-  DeviceResponse HandleCommand(const DeviceCommand &command) override {
-    std::cout << "客户端处理设备命令: " << command.device_id << " - " << command.command_type << std::endl;
+  void OnDeviceConnectionChanged(const std::string& device_id, bool connected) override {
+    std::cout << "设备连接状态变化: " << device_id << " " << (connected ? "已连接" : "已断开") << std::endl;
+  }
+
+  void OnDeviceStatusChanged(const std::string& device_id, DeviceStatus old_status, DeviceStatus new_status) override {
+    std::cout << "设备状态变化: " << device_id << " " 
+              << DeviceUtils::StatusToString(old_status) << " -> " 
+              << DeviceUtils::StatusToString(new_status) << std::endl;
+  }
+
+  void OnDeviceDataReceived(const DeviceData& device_data) override {
+    std::cout << "收到设备数据: " << device_data.device_id 
+              << " 类型: " << device_data.data_type 
+              << " 大小: " << device_data.data_size << std::endl;
+  }
+
+  DeviceResponse OnDeviceCommand(const DeviceCommand& command) override {
+    std::cout << "处理设备命令: " << command.device_id 
+              << " 类型: " << command.command_type << std::endl;
 
     DeviceResponse response;
     response.device_id = command.device_id;
@@ -44,66 +61,29 @@ class ExampleDeviceHandler : public DeviceHandler {
     } else if (command.command_type == "configure") {
       response.data["config"] = command.parameters;
       std::cout << "设备 " << command.device_id << " 配置已更新" << std::endl;
+    } else if (command.command_type == "status") {
+      response.data["status"] = "online";
+      response.data["cpu_usage"] = 20.0f;
+      response.data["memory_usage"] = 30.0f;
+      response.data["temperature"] = 32.0f;
+    } else {
+      response.success = false;
+      response.message = "未知命令类型";
+      response.error_code = 1001;
     }
 
     return response;
   }
 
-  DeviceStatusInfo GetDeviceStatus(const std::string &device_id) override {
-    DeviceStatusInfo status;
-    status.device_id = device_id;
-    status.status = DeviceStatus::Online;
-    status.status_message = "客户端设备正常运行";
-    status.timestamp = DeviceUtils::GetCurrentTimestamp();
-    status.cpu_usage = 20.0f;
-    status.memory_usage = 30.0f;
-    status.temperature = 32.0f;
-    status.status_data["uptime"] = 1800;
-    status.status_data["data_count"] = 500;
-
-    return status;
-  }
-
-  DeviceInfo GetDeviceInfo(const std::string &device_id) override {
-    DeviceInfo info;
-    info.device_id = device_id;
-    info.device_name = "客户端示例设备";
-
-    info.device_model = "Client-Camera-001";
-    info.device_version = "1.0.0";
-    info.device_serial = "SN987654321";
-    info.device_ip = "192.168.1.200";
-    info.device_port = 8081;
-    info.capabilities = {DeviceCapability::Capture, DeviceCapability::Configure, DeviceCapability::Status};
-    info.status = DeviceStatus::Online;
-    info.status_message = "客户端设备在线";
-    info.last_heartbeat = DeviceUtils::GetCurrentTimestamp();
-    info.config["resolution"] = "1280x720";
-    info.config["fps"] = 25;
-
-    return info;
-  }
-
-};
-
-// 示例事件处理器
-class ExampleEventHandler : public DeviceEventHandler {
- public:
-  void OnDeviceStatusChanged(const std::string &device_id, DeviceStatus old_status, DeviceStatus new_status) override {
-    std::cout << "客户端设备状态变化: " << device_id << " " << DeviceUtils::StatusToString(old_status) << " -> " << DeviceUtils::StatusToString(new_status) << std::endl;
-  }
-
-  void OnDeviceDataReceived(const DeviceData &device_data) override {
-    std::cout << "客户端收到设备数据: " << device_data.device_id << " 类型: " << device_data.data_type << " 大小: " << device_data.data_size << std::endl;
-  }
-
-  void OnDeviceError(const std::string &device_id, uint16_t error_code, const std::string &error_message) override {
-    std::cout << "客户端设备错误: " << device_id << " 错误码: " << error_code << " 消息: " << error_message << std::endl;
+  void OnDeviceError(const std::string& device_id, uint16_t error_code, const std::string& error_message) override {
+    std::cout << "设备错误: " << device_id 
+              << " 错误码: " << error_code 
+              << " 消息: " << error_message << std::endl;
   }
 };
 
 int main(int argc, char *argv[]) {
-  std::cout << "=== Device Center Client ===" << std::endl;
+  std::cout << "=== Device Center Client (优化版) ===" << std::endl;
 
   // 设置信号处理
   signal(SIGINT, SignalHandler);
@@ -126,14 +106,9 @@ int main(int argc, char *argv[]) {
       return -1;
     }
 
-    // 注册设备处理器
-    std::cout << "正在注册设备处理器..." << std::endl;
-    auto device_handler = std::make_shared<ExampleDeviceHandler>();
-    g_client->RegisterDeviceHandler("camera_001", device_handler);
-    g_client->RegisterDeviceHandler("sensor_001", device_handler);
-
-    // 注册事件处理器
-    auto event_handler = std::make_shared<ExampleEventHandler>();
+    // 注册统一的事件处理器
+    std::cout << "正在注册事件处理器..." << std::endl;
+    auto event_handler = std::make_shared<UnifiedDeviceEventHandler>();
     g_client->RegisterEventHandler(event_handler);
 
     // 启动客户端
@@ -184,7 +159,7 @@ int main(int argc, char *argv[]) {
       std::cout << "设备客户端已启动（未连接）。等待发现并自动重试..." << std::endl;
     }
     std::cout << "客户端ID: " << g_client->GetConfig().service_id << std::endl;
-    std::cout << "服务器地址: " << g_client->GetConfig().server_address << ":" << g_client->GetConfig().server_port << std::endl;
+    std::cout << "本地端口: " << g_client->GetConfig().local_port << std::endl;
     std::cout << "按 Ctrl+C 停止客户端" << std::endl;
 
     // 注册示例设备
@@ -198,63 +173,66 @@ int main(int argc, char *argv[]) {
 
     if (g_client->RegisterDevice("camera_001", camera_config)) {
       std::cout << "相机设备注册成功" << std::endl;
-
-      // 启用心跳
-      g_client->EnableDeviceHeartbeat("camera_001", 5000);
+    } else {
+      std::cerr << "相机设备注册失败" << std::endl;
     }
 
     // 注册传感器设备
     nlohmann::json sensor_config;
-    sensor_config["sampling_rate"] = 1000;
-    sensor_config["calibration_enabled"] = true;
+    sensor_config["type"] = "temperature";
+    sensor_config["unit"] = "celsius";
+    sensor_config["precision"] = 0.1;
 
     if (g_client->RegisterDevice("sensor_001", sensor_config)) {
       std::cout << "传感器设备注册成功" << std::endl;
-
-      // 启用心跳
-      g_client->EnableDeviceHeartbeat("sensor_001", 3000);
+    } else {
+      std::cerr << "传感器设备注册失败" << std::endl;
     }
 
     // 运行客户端循环
     while (g_running) {
       std::this_thread::sleep_for(std::chrono::seconds(1));
 
-      // 定期上报设备状态
-      static int counter = 0;
-      if (++counter % 10 == 0) {  // 每10秒上报一次状态
-        DeviceStatusInfo camera_status;
-        camera_status.device_id = "camera_001";
-        camera_status.status = DeviceStatus::Online;
-        camera_status.status_message = "相机正常运行";
-        camera_status.timestamp = DeviceUtils::GetCurrentTimestamp();
-        camera_status.cpu_usage = 15.0f;
-        camera_status.memory_usage = 25.0f;
-        camera_status.temperature = 30.0f;
-
-        g_client->ReportDeviceStatus("camera_001", camera_status);
-
-        DeviceStatusInfo sensor_status;
-        sensor_status.device_id = "sensor_001";
-        sensor_status.status = DeviceStatus::Online;
-        sensor_status.status_message = "传感器正常运行";
-        sensor_status.timestamp = DeviceUtils::GetCurrentTimestamp();
-        sensor_status.cpu_usage = 10.0f;
-        sensor_status.memory_usage = 15.0f;
-        sensor_status.temperature = 28.0f;
-
-        g_client->ReportDeviceStatus("sensor_001", sensor_status);
-      }
-
       // 定期输出统计信息
-      if (counter % 30 == 0) {  // 每30秒输出一次统计信息
+      static int counter = 0;
+      if (++counter % 30 == 0) {  // 每30秒输出一次统计信息
         auto stats = g_client->GetClientStatistics();
         std::cout << "客户端统计: " << stats.dump(2) << std::endl;
 
-        auto devices = g_client->GetRegisteredDevices();
+        auto devices = g_client->GetAllDevices();
         std::cout << "已注册设备数量: " << devices.size() << std::endl;
 
-        auto connection_status = g_client->GetConnectionStatus();
-        std::cout << "连接状态: " << connection_status.dump(2) << std::endl;
+        auto online_devices = g_client->GetOnlineDevices();
+        std::cout << "在线设备数量: " << online_devices.size() << std::endl;
+
+        // 上报设备状态
+        for (const auto& device : devices) {
+          DeviceStatusInfo status;
+          status.device_id = device.device_id;
+          status.status = DeviceStatus::Online;
+          status.status_message = "正常运行";
+          status.timestamp = DeviceUtils::GetCurrentTimestamp();
+          status.cpu_usage = 20.0f + (rand() % 20);  // 模拟CPU使用率
+          status.memory_usage = 30.0f + (rand() % 30);  // 模拟内存使用率
+          status.temperature = 30.0f + (rand() % 10);  // 模拟温度
+          status.status_data["uptime"] = counter * 30;
+          status.status_data["data_count"] = rand() % 1000;
+
+          g_client->ReportDeviceStatus(device.device_id, status);
+        }
+
+        // 模拟设备数据上报
+        for (const auto& device : devices) {
+          DeviceData data;
+          data.device_id = device.device_id;
+          data.data_type = "sensor_data";
+          data.timestamp = DeviceUtils::GetCurrentTimestamp();
+          data.data["value"] = rand() % 100;
+          data.data["unit"] = "raw";
+          data.data_size = 16;
+
+          g_client->ReportDeviceData(data);
+        }
       }
     }
 

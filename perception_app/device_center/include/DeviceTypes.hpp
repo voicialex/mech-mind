@@ -174,45 +174,24 @@ struct DeviceControlResponse {
     uint16_t error_code;             // 错误码
 };
 
-/**
- * @brief 设备处理器接口
- */
-class DeviceHandler {
-public:
-    using Ptr = std::shared_ptr<DeviceHandler>;
-    
-    virtual ~DeviceHandler() = default;
-    
-    /**
-     * @brief 处理设备命令
-     * @param command 设备命令
-     * @return 设备响应
-     */
-    virtual DeviceResponse HandleCommand(const DeviceCommand& command) = 0;
-    
-    /**
-     * @brief 获取设备状态
-     * @param device_id 设备ID
-     * @return 设备状态
-     */
-    virtual DeviceStatusInfo GetDeviceStatus(const std::string& device_id) = 0;
-    
-    /**
-     * @brief 获取设备信息
-     * @param device_id 设备ID
-     * @return 设备信息
-     */
-    virtual DeviceInfo GetDeviceInfo(const std::string& device_id) = 0;
-};
+// DeviceHandler接口已移除，功能合并到DeviceEventHandler中
 
 /**
- * @brief 设备事件回调接口
+ * @brief 统一的设备事件处理器接口
+ * 合并了原来的DeviceHandler和DeviceEventHandler的功能
  */
 class DeviceEventHandler {
 public:
     using Ptr = std::shared_ptr<DeviceEventHandler>;
     
     virtual ~DeviceEventHandler() = default;
+    
+    /**
+     * @brief 设备连接事件
+     * @param device_id 设备ID
+     * @param connected 是否连接
+     */
+    virtual void OnDeviceConnectionChanged(const std::string& device_id, bool connected) = 0;
     
     /**
      * @brief 设备状态变化事件
@@ -229,6 +208,13 @@ public:
      * @param device_data 设备数据
      */
     virtual void OnDeviceDataReceived(const DeviceData& device_data) = 0;
+    
+    /**
+     * @brief 设备命令处理
+     * @param command 设备命令
+     * @return 设备响应
+     */
+    virtual DeviceResponse OnDeviceCommand(const DeviceCommand& command) = 0;
     
     /**
      * @brief 设备错误事件

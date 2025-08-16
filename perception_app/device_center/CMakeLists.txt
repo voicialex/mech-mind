@@ -37,9 +37,11 @@ endif()
 
 # 源文件
 set(DEVICE_CENTER_SOURCES
+    src/DeviceManager.cpp
     src/DeviceServer.cpp
     src/DeviceClient.cpp
     src/DeviceUtils.cpp
+    src/DeviceCommunicationAdapter.cpp
 )
 
 set(SERVER_APP_SOURCES
@@ -57,7 +59,7 @@ add_library(device_center STATIC ${DEVICE_CENTER_SOURCES})
 set_target_properties(device_center PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
-    PUBLIC_HEADER include/DeviceServer.hpp include/DeviceClient.hpp include/DeviceTypes.hpp
+    PUBLIC_HEADER include/DeviceManager.hpp include/DeviceServer.hpp include/DeviceClient.hpp include/DeviceTypes.hpp include/DeviceCommunicationAdapter.hpp
 )
 
 # 链接库
@@ -138,7 +140,7 @@ if(BUILD_DEVICE_CLIENT)
     )
 endif()
 
-install(FILES include/DeviceServer.hpp include/DeviceClient.hpp include/DeviceTypes.hpp
+install(FILES include/DeviceManager.hpp include/DeviceServer.hpp include/DeviceClient.hpp include/DeviceTypes.hpp include/DeviceCommunicationAdapter.hpp
     DESTINATION include/device_center
 )
 
