@@ -10,7 +10,8 @@ Perception Application 是一个基于ASIO的分布式感知应用框架，提�
 perception_app/
 ├── doc/                           # 项目文档
 │   ├── README.md                  # 项目主文档
-│   ├── CommunicationArchitecture.md # 通信架构设计
+│   ├── CommunicationArchitecture.md # 通信架构（最终版）
+│   ├── NetworkDeployment.md       # 网络部署说明（最终版）
 │   ├── InferenceInterface.md      # 推理接口设计
 │   └── DevelopmentGuide.md        # 开发指南
 ├── include/                       # 公共头文件

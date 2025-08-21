@@ -1,50 +1,121 @@
-# 感知应用通信架构设计
+# 通信架构（最终版）
 
 ## 概述
 
-本文档描述了基于ASIO库设计的感知应用通信架构，该架构实现了独立的通信层和消息层，为runtime提供统一的通信能力，支持感知应用的网络化部署和扩展。
+本架构以“端点（Endpoint）”为中心，彻底解耦服务发现与TCP通信能力，统一配置结构，统一事件处理回调，支持客户端自动重连、服务端端口复用与快速优雅退出。
 
-## 架构设计
-
-### 核心组件
+## 分层结构
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    感知应用通信架构                           │
-├─────────────────────────────────────────────────────────────┤
-│  Runtime Layer (运行时层)                                    │
-│  ├── CommunicationInterface (通信接口)                       │
-│  ├── CommunicationInterfaceManager (通信接口管理器)          │
-│  └── Runtime Integration (运行时集成)                        │
-├─────────────────────────────────────────────────────────────┤
-│  Communication Layer (通信层)                                │
-│  ├── CommunicationManager (通信管理器)                       │
-│  ├── TcpConnection (TCP连接管理)                             │
-│  ├── UdpDiscovery (UDP服务发现)                              │
-│  └── MessageProcessor (消息处理器)                           │
-├─────────────────────────────────────────────────────────────┤
-│  Message Layer (消息层)                                      │
-│  ├── MessageProtocol (消息协议)                              │
-│  ├── PerceptionMessages (感知消息)                           │
-│  ├── MessageFactory (消息工厂)                               │
-│  └── MessageRouter (消息路由器)                              │
-├─────────────────────────────────────────────────────────────┤
-│  Transport Layer (传输层)                                    │
-│  ├── ASIO (异步网络库)                                       │
-│  ├── TCP/UDP Sockets (套接字)                                │
-│  └── Serialization (序列化)                                  │
-└─────────────────────────────────────────────────────────────┘
+应用层（App）
+├─ 节点层（Nodes）
+│  ├─ MasterNode（设备服务器 + 服务发现广播 + EndpointServer）
+│  └─ ClientNode（服务发现监听 + DeviceClient + 可选 ControllerClient）
+│
+├─ 端点层（Endpoints）
+│  ├─ EndpointService（统一基类，聚焦TCP连接与消息传输）
+│  ├─ EndpointClient（客户端逻辑、自动重连、心跳）
+│  └─ EndpointServer（服务端逻辑、连接管理、超时清理）
+│
+├─ 传输层（Transport）
+│  └─ AsioTransport（基于 ASIO 的 TCP 实现，SO_REUSEADDR，线程安全）
+│
+└─ 服务发现（Service Discovery）
+   └─ UdpServiceDiscovery（UDP 广播/接收，按需启动，回调式返回）
 ```
 
-### 设计原则
+## 核心统一体
 
-1. **独立性**: 通信层只关注通信功能，不耦合业务逻辑
-2. **模块化设计**: 各层职责清晰，接口明确
-3. **异步通信**: 基于ASIO实现高性能异步通信
-4. **服务发现**: 自动发现和管理网络服务
-5. **消息传输**: 提供通用的消息传输接口
-6. **错误处理**: 完善的错误处理和恢复机制
-7. **可扩展性**: 支持插件式扩展和配置
+- 统一配置：`EndpointConfig : EndpointIdentity`
+  - `EndpointIdentity`：`id/name/address/port/type` + 活动状态（`is_active/last_activity/activity_count`）。
+  - `EndpointConfig`：仅保留行为配置（重连、心跳、检查间隔）与服务器专属（`max_clients/client_timeout`）。
+
+- 统一事件：`ITransport::EventHandler`
+  - `OnMessageReceived(endpoint_id, data)`
+  - `OnConnectionChanged(endpoint_id, connected, ConnectionInfo)`（包含完整远端信息）
+  - `OnError(endpoint_id, code, message)`
+  - Client/Server/Nodes 直接复用，不再在节点层转发封装。
+
+## 关键设计点
+
+- 服务发现地址来源修复
+  - 仅当 JSON 广播中的 `address` 为空或为 `0.0.0.0` 时，才回退使用 `sender.address()`，避免被 WSL/Docker 虚拟网卡地址覆盖。
+
+- 自动重连与心跳
+  - Client 运行时通过 `ConnectToServer(address, port)` 指定目标；重连与心跳周期由 `EndpointConfig` 控制。
+
+- 端口复用与快速重启
+  - Server 监听端启用 `SO_REUSEADDR`；客户端/服务端停止时主动关闭连接与 IO，上下文线程带 1s 超时退出。
+
+- 优雅退出
+  - 监控/心跳线程在 1s 内等待退出，超时分离；IO 线程同策略，避免长时间阻塞。
+
+## 节点层行为
+
+- MasterNode
+  - 配置：`device_server_id/name/address/port/max_clients`。
+  - 行为：启动服务发现广播；创建 `EndpointServer` 并监听；事件在 `MasterNodeEventHandler` 内直接记录日志。
+
+- ClientNode
+  - 配置：`device_client_id/name`、`controller_client_id/name`、`enable_controller_client`。
+  - 行为：监听服务发现；发现 `Device Server` 时由 `device_client` 连接；如启用控制器客户端，匹配 `Controller Server` 后连接。
+  - 事件：`DeviceClientEventHandler`、`ControllerClientEventHandler` 内直接处理与日志。
+
+## 端点层职责
+
+- EndpointService
+  - 聚焦 TCP 连接、消息收发、统计与状态；对外统一接口：`Initialize/Start/Stop/Cleanup/SendMessage/BroadcastMessage`。
+  - 统一 `GetConfig()/GetStatistics()/IsRunning()`。
+
+- EndpointClient
+  - 运行时 `ConnectToServer(address, port)` 指定目标；支持自动重连、心跳与连接监控。
+
+- EndpointServer
+  - 管理客户端表；基于 `max_clients/client_timeout` 控制接入与清理。
+
+## 传输层要点（AsioTransport）
+
+- Server：`acceptor` 绑定 `address:port`，`reuse_address=true`；接受连接后立即上报 `OnConnectionChanged`。
+- Client：解析目标并异步连接；连接建立/失败分别上报。
+- 统计：消息计数、错误计数、连接计数；统一 JSON 导出。
+- 退出：`Stop()` 关闭所有连接、关闭 acceptor、停止 IO；1 秒超时等待 IO 线程退出。
+
+## 服务发现（UdpServiceDiscovery）
+
+- 广播：按 `broadcast_interval` 定时发送本地服务 JSON。
+- 接收：独立 IO 线程监听；解析 JSON → 若 `address` 合法则保留，否则回填 `sender.address()`；去重缓存并回调。
+- 资源：广播与接收各自持有独立 `io_context/thread/socket`，按需启停，`Stop()` 统一清理。
+
+## 命名与兼容
+
+- 统一命名：`device_client` / `controller_client` / `device_server`。
+- 删除：历史 `ServiceInfo/TransportConfig/BaseConfig/ClientConfig/ServerConfig`；统一为 `EndpointIdentity/EndpointConfig`。
+
+## 示例
+
+```cpp
+// MasterNode 配置
+MasterNode::Config cfg;
+cfg.device_server_id = "device_server_001";
+cfg.device_server_name = "Device Server";
+cfg.device_server_address = "0.0.0.0";
+cfg.device_server_port = 9090;
+cfg.max_clients = 100;
+
+// ClientNode 配置
+ClientNode::Config ccfg;
+ccfg.device_client_id = "device_client_001";
+ccfg.device_client_name = "Device Client";
+ccfg.controller_client_id = "controller_client_001";
+ccfg.controller_client_name = "Controller Client";
+ccfg.enable_controller_client = true;
+```
+
+## 常见问题
+
+- 服务发现到的地址是 172.19.*：这是虚拟网卡地址。已修复为仅在 JSON 中无有效地址时回退使用 sender 地址；确保服务端广播填入可达地址。
+- 退出耗时：主要等待监控/心跳/IO 线程退出；已降至 1 秒超时并可强制分离，避免长阻塞。
+
 
 ## 详细设计
 

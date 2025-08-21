@@ -1,25 +1,27 @@
 {
-    "render_config": {
-        "enable": true,
-        "window_title": "Mech-Eye 3D Camera Display",
-        "window_width": 1280,
-        "window_height": 720
-    },
-    "capture_config": {
-        "enable": true,
-        "suffix": "",
-        "color_file": "2DImage.png",
-        "depth_file": "DepthMap.tiff",
-        "point_cloud_file": "PointCloud.ply",
-        "textured_point_cloud_file": "TexturedPointCloud.ply"
-    },
-    "save_config": {
-        "save_path": "./dumps/",
-        "save_2d_image": true,
-        "save_depth_map": true,
-        "save_point_cloud": true,
-        "save_textured_point_cloud": true,
-        "max_save_count": 20
+    "camera_config": {
+        "render": {
+            "enable": true,
+            "window_title": "Mech-Eye 3D Camera Display",
+            "window_width": 1280,
+            "window_height": 720
+        },
+        "capture": {
+            "enable": true,
+            "suffix": "",
+            "color_file": "2DImage.png",
+            "depth_file": "DepthMap.tiff",
+            "point_cloud_file": "PointCloud.ply",
+            "textured_point_cloud_file": "TexturedPointCloud.ply"
+        },
+        "save": {
+            "save_path": "./dumps/",
+            "save_2d_image": true,
+            "save_depth_map": true,
+            "save_point_cloud": true,
+            "save_textured_point_cloud": true,
+            "max_save_count": 20
+        }
     },
     "log_config": {
         "enable": true,
@@ -30,5 +32,6 @@
     "inference_config": {
         "enable": true,
         "config_path": "config/inference_config.json"
-    }
+    },
+    "communication_config": "config/communication_config.json"
 }

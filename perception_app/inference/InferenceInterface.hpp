@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <string>
-#include "runtime/core/FrameSet.hpp"
+#include "runtime/camera/FrameSet.hpp"
 #include "Logger.hpp"
 
 /**

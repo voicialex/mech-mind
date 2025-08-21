@@ -226,17 +226,32 @@ auto frame = camera_.captureFrame();  // 获取当前帧
 
 ```
 perception_app/
-├── doc/                    # 文档
-├── include/                # 公共头文件
-├── communication/          # 通信层
-├── message/                # 消息层
-├── runtime/                # 运行时框架
-├── inference/              # 推理算法
-├── config/                 # 配置文件
-├── examples/               # 示例代码
-├── tests/                  # 测试代码
-├── scripts/                # 构建脚本
-└── third_party/            # 第三方库
+├── doc/                      # 文档（最终版统一于此）
+│   ├── README.md
+│   ├── CommunicationArchitecture.md   # 通信/端点/发现/传输 架构
+│   ├── NetworkDeployment.md           # 网络部署与连通性验证
+│   ├── DevelopmentGuide.md            # 本文档
+│   └── InferenceInterface.md          # 推理接口与集成说明
+├── runtime/
+│   ├── communication/                 # 通信模块（端点/传输/发现/接口）
+│   │   ├── interfaces/                # ITransport/IEndpointService/ConnectionTypes
+│   │   ├── transports/                # AsioTransport
+│   │   ├── discovery/                 # UdpServiceDiscovery
+│   │   └── endpoints/                 # EndpointService/Client/Server
+│   ├── adapter/                       # 节点层（MasterNode/ClientNode + 示例）
+│   │   ├── master_node/
+│   │   ├── client_node/
+│   │   └── examples/                  # adapter_server_example / adapter_client_example
+│   ├── core/                           # 相机运行时
+│   │   ├── CameraManager.*
+│   │   ├── FrameSet.*
+│   │   └── utils/
+│   └── configure/                      # ConfigHelper
+├── message/                            # 消息/协议定义与工厂/路由
+├── inference/                          # 推理接口与示例算法
+├── config/                              # 配置文件
+├── CMakeLists.txt
+└── build.sh
 ```
 
 ### 2. 开发步骤
@@ -695,6 +710,31 @@ perf top -p $(pgrep perception_app)
 ```
 
 ## 贡献指南
+
+## 运行与示例
+
+### 1. 编译
+```bash
+./build.sh
+```
+
+### 2. 运行通信示例（节点层）
+```bash
+# 启动 Master 节点（服务器 + UDP 广播）
+./build/bin/adapter_server_example
+
+# 启动 Client 节点（服务发现 + DeviceClient [+ 可选 ControllerClient]）
+./build/bin/adapter_client_example
+```
+
+示例的网络部署、端口与连通性验证请参考 `doc/NetworkDeployment.md`。
+
+### 3. 运行相机运行时
+```bash
+./build/bin/perception_app
+```
+
+相机数据采集与推理集成流程见 `runtime/core/CameraManager.*` 与 `doc/InferenceInterface.md`。
 
 ### 1. 代码贡献
 

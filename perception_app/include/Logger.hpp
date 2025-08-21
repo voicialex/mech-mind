@@ -4,6 +4,11 @@
 #include <sstream>
 #include <chrono>
 #include <iomanip>
+#include <cstdio>
+
+
+// #define LOGGER_ENABLE_SOURCE_INFO 0
+// #define LOGGER_ENABLE_TIMESTAMP 0
 
 class Logger {
 public:
@@ -17,8 +22,8 @@ public:
     // Log stream class for supporting << operator
     class LogStream {
     public:
-        LogStream(Logger& logger, Level level) 
-            : logger_(logger), level_(level) {}
+        LogStream(Logger& logger, Level level, const char* file, const char* func, int line) 
+            : logger_(logger), level_(level), file_(file), func_(func), line_(line) {}
         
         // Disable copy constructor and assignment operator
         LogStream(const LogStream&) = delete;
@@ -26,7 +31,7 @@ public:
         
         // Allow move constructor
         LogStream(LogStream&& other) noexcept
-            : logger_(other.logger_), level_(other.level_), message_(std::move(other.message_)) {
+            : logger_(other.logger_), level_(other.level_), file_(other.file_), func_(other.func_), line_(other.line_), message_(std::move(other.message_)) {
             other.message_.str(""); // Clear source object's message
         }
         
@@ -35,7 +40,7 @@ public:
         
         ~LogStream() {
             if (!message_.str().empty()) {
-                logger_.output(level_, message_.str());
+                logger_.output(level_, message_.str(), file_, func_, line_);
             }
         }
         
@@ -55,6 +60,9 @@ public:
     private:
         Logger& logger_;
         Level level_;
+        const char* file_;
+        const char* func_;
+        int line_;
         std::ostringstream message_;
     };
 
@@ -68,21 +76,21 @@ public:
         current_level_ = level;
     }
 
-    // Stream log output methods
-    LogStream debug() {
-        return LogStream(*this, Level::DEBUG);
+    // Stream log output methods with file info
+    LogStream debug(const char* file = __FILE__, const char* func = __FUNCTION__, int line = __LINE__) {
+        return LogStream(*this, Level::DEBUG, file, func, line);
     }
 
-    LogStream info() {
-        return LogStream(*this, Level::INFO);
+    LogStream info(const char* file = __FILE__, const char* func = __FUNCTION__, int line = __LINE__) {
+        return LogStream(*this, Level::INFO, file, func, line);
     }
 
-    LogStream warning() {
-        return LogStream(*this, Level::WARNING);
+    LogStream warning(const char* file = __FILE__, const char* func = __FUNCTION__, int line = __LINE__) {
+        return LogStream(*this, Level::WARNING, file, func, line);
     }
 
-    LogStream error() {
-        return LogStream(*this, Level::ERROR);
+    LogStream error(const char* file = __FILE__, const char* func = __FUNCTION__, int line = __LINE__) {
+        return LogStream(*this, Level::ERROR, file, func, line);
     }
 
     // Original template methods (maintain compatibility)
@@ -129,18 +137,37 @@ private:
     Logger& operator=(const Logger&) = delete;
 
     void output(Level level, const std::string& message) {
+        output(level, message, "", "", 0);
+    }
+
+    void output(Level level, const std::string& message, const char* file, const char* func, int line) {
         if (level < current_level_) {
             return;
         }
         
+        std::ostringstream line_prefix;
+
+#if LOGGER_ENABLE_TIMESTAMP
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             now.time_since_epoch()) % 1000;
+        line_prefix << "[" << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S")
+                    << "." << std::setfill('0') << std::setw(3) << ms.count() << "]";
+#endif
 
-        std::cout << "[" << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S")
-                  << "." << std::setfill('0') << std::setw(3) << ms.count() << "] "
-                  << getLevelString(level) << ": " << message << std::endl;
+#if LOGGER_ENABLE_SOURCE_INFO
+        if (file && file[0] != '\0') {
+            if (line_prefix.tellp() > 0) line_prefix << ' ';
+            line_prefix << "[" << getFileName(file) << ":" << line << " " << func << "]";
+        }
+#endif
+
+        if (line_prefix.tellp() > 0) {
+            std::cout << line_prefix.str() << ' ';
+        }
+
+        std::cout << getLevelString(level) << ": " << message << std::endl;
     }
 
     std::string getLevelString(Level level) {
@@ -153,6 +180,15 @@ private:
         }
     }
 
+    std::string getFileName(const char* filePath) {
+        std::string path(filePath);
+        size_t pos = path.find_last_of("/\\");
+        if (pos != std::string::npos) {
+            return path.substr(pos + 1);
+        }
+        return path;
+    }
+
     Level current_level_;
 };
 
@@ -162,8 +198,8 @@ private:
 #define LOG_WARNING(...) Logger::getInstance().warning(__VA_ARGS__)
 #define LOG_ERROR(...)   Logger::getInstance().error(__VA_ARGS__)
 
-// Stream operator macro definitions
-#define LOG_DEBUG_STREAM   Logger::getInstance().debug()
-#define LOG_INFO_STREAM    Logger::getInstance().info()
-#define LOG_WARNING_STREAM Logger::getInstance().warning()
-#define LOG_ERROR_STREAM   Logger::getInstance().error() 
+// Stream operator macro definitions with file info
+#define LOG_DEBUG_STREAM   Logger::getInstance().debug(__FILE__, __FUNCTION__, __LINE__)
+#define LOG_INFO_STREAM    Logger::getInstance().info(__FILE__, __FUNCTION__, __LINE__)
+#define LOG_WARNING_STREAM Logger::getInstance().warning(__FILE__, __FUNCTION__, __LINE__)
+#define LOG_ERROR_STREAM   Logger::getInstance().error(__FILE__, __FUNCTION__, __LINE__) 

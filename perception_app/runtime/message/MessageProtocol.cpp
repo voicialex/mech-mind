@@ -1,121 +1,245 @@
-#include "MessageProtocol.hpp"
+#include "IMessageProtocol.hpp"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
+#include <mutex>
 
 namespace perception {
 
-// Message类实现 - 只实现头文件中声明但未实现的方法
+// Message类实现
+class Message : public IMessage {
+public:
+    Message() : status_(MessageStatus::Pending), timestamp_(std::chrono::steady_clock::now()) {
+        frame_.magic_id = ProtocolFrame::MAGIC_ID;
+        frame_.crc16 = 0;
+        frame_.message_type = 0;
+        frame_.message_id = 0;
+        frame_.sub_message_id = 0;
+        frame_.sequence = 0;
+        frame_.length = 0;
+    }
 
-Message::Message() : status_(MessageStatus::Pending), timestamp_(std::chrono::steady_clock::now()) {
-    frame_.magic_id = ProtocolFrame::MAGIC_ID;
-    frame_.crc16 = 0;
-    frame_.message_type = 0;
-    frame_.message_id = 0;
-    frame_.sub_message_id = 0;
-    frame_.sequence = 0;
-    frame_.length = 0;
-}
+    Message(MessageType message_type, uint16_t message_id, uint8_t sub_message_id)
+        : status_(MessageStatus::Pending), timestamp_(std::chrono::steady_clock::now()) {
+        frame_.magic_id = ProtocolFrame::MAGIC_ID;
+        frame_.crc16 = 0;
+        frame_.message_type = static_cast<uint8_t>(message_type);
+        frame_.message_id = message_id;
+        frame_.sub_message_id = sub_message_id;
+        frame_.sequence = 0;
+        frame_.length = 0;
+    }
 
-Message::Message(uint8_t message_type, uint16_t message_id, uint8_t sub_message_id)
-    : status_(MessageStatus::Pending), timestamp_(std::chrono::steady_clock::now()) {
-    frame_.magic_id = ProtocolFrame::MAGIC_ID;
-    frame_.crc16 = 0;
-    frame_.message_type = message_type;
-    frame_.message_id = message_id;
-    frame_.sub_message_id = sub_message_id;
-    frame_.sequence = 0;
-    frame_.length = 0;
-}
-
-void Message::SetPayload(const std::vector<uint8_t>& payload) {
-    frame_.payload = payload;
-    frame_.length = static_cast<uint16_t>(payload.size());
-}
-
-std::string Message::GetMessageTypeString() const {
-    return MessageFactory::GetMessageTypeName(frame_.message_id);
-}
-
-std::string Message::GetSubMessageTypeString() const {
-    return MessageFactory::GetSubMessageTypeName(frame_.sub_message_id);
-}
-
-std::string Message::ToString() const {
-    std::ostringstream oss;
-    oss << "Message{type=" << static_cast<int>(frame_.message_type)
-        << ", id=" << frame_.message_id 
-        << ", sub_id=" << static_cast<int>(frame_.sub_message_id)
-        << ", seq=" << frame_.sequence
-        << ", length=" << frame_.length
-        << ", status=" << static_cast<int>(status_) << "}";
-    return oss.str();
-}
-
-std::string Message::ToHexString() const {
-    std::ostringstream oss;
-    oss << std::hex << std::setfill('0');
+    // IMessage接口实现
+    MessageType GetType() const override { return static_cast<MessageType>(frame_.message_type); }
+    uint16_t GetMessageId() const override { return frame_.message_id; }
+    uint8_t GetSubMessageId() const override { return frame_.sub_message_id; }
+    uint16_t GetSequence() const override { return frame_.sequence; }
+    uint64_t GetTimestamp() const override { 
+        return std::chrono::duration_cast<std::chrono::milliseconds>(timestamp_.time_since_epoch()).count(); 
+    }
+    MessageStatus GetStatus() const override { return status_; }
+    void SetStatus(MessageStatus status) override { status_ = status; }
     
-    // 添加帧头
-    oss << std::setw(4) << frame_.magic_id << " ";
-    oss << std::setw(4) << frame_.crc16 << " ";
-    oss << std::setw(2) << static_cast<int>(frame_.message_type) << " ";
-    oss << std::setw(4) << frame_.message_id << " ";
-    oss << std::setw(2) << static_cast<int>(frame_.sub_message_id) << " ";
-    oss << std::setw(4) << frame_.sequence << " ";
-    oss << std::setw(4) << frame_.length << " ";
+    const ProtocolFrame& GetFrame() const override { return frame_; }
+    void SetFrame(const ProtocolFrame& frame) override { frame_ = frame; }
+
+    std::vector<uint8_t> Serialize() const override {
+        return MessageFactory::BuildFrame(frame_);
+    }
+
+    bool Deserialize(const std::vector<uint8_t>& data) override {
+        if (!MessageFactory::ValidateMessage(data)) {
+            return false;
+        }
+        frame_ = MessageFactory::ParseFrame(data);
+        return true;
+    }
+
+    bool Validate() const override {
+        return MessageFactory::ValidateMessage(Serialize());
+    }
+
+    std::string ToString() const override {
+        std::ostringstream oss;
+        oss << "Message{type=" << static_cast<int>(frame_.message_type)
+            << ", id=" << frame_.message_id 
+            << ", sub_id=" << static_cast<int>(frame_.sub_message_id)
+            << ", seq=" << frame_.sequence
+            << ", length=" << frame_.length
+            << ", status=" << static_cast<int>(status_) << "}";
+        return oss.str();
+    }
+
+    std::string ToHexString() const {
+        std::ostringstream oss;
+        oss << std::hex << std::setfill('0');
+        
+        auto data = Serialize();
+        for (size_t i = 0; i < data.size(); ++i) {
+            if (i > 0) oss << " ";
+            oss << std::setw(2) << static_cast<int>(data[i]);
+        }
+        
+        return oss.str();
+    }
+
+private:
+    ProtocolFrame frame_;
+    MessageStatus status_;
+    std::chrono::steady_clock::time_point timestamp_;
+};
+
+// MessageFactory静态成员初始化
+std::unordered_map<uint16_t, MessageFactory::Creator> MessageFactory::creators_;
+std::unordered_map<uint16_t, std::string> MessageFactory::message_type_names_;
+std::unordered_map<uint8_t, std::string> MessageFactory::sub_message_type_names_;
+std::unordered_map<uint16_t, std::string> MessageFactory::error_code_descriptions_;
+std::mutex MessageFactory::factory_mutex_;
+
+// 初始化消息类型名称映射
+void MessageFactory::InitializeMessageTypeNames() {
+    std::lock_guard<std::mutex> lock(factory_mutex_);
     
-    // 添加负载数据
-    for (uint8_t byte : frame_.payload) {
-        oss << std::setw(2) << static_cast<int>(byte) << " ";
+    // 系统消息
+    message_type_names_[MessageIds::HEARTBEAT] = "Heartbeat";
+    message_type_names_[MessageIds::SERVICE_DISCOVERY] = "ServiceDiscovery";
+    message_type_names_[MessageIds::CONNECTION_REQUEST] = "ConnectionRequest";
+    message_type_names_[MessageIds::CONNECTION_RESPONSE] = "ConnectionResponse";
+    
+    // 充电枪操作消息
+    message_type_names_[MessageIds::START_CHARGING] = "StartCharging";
+    message_type_names_[MessageIds::STOP_CHARGING] = "StopCharging";
+    message_type_names_[MessageIds::EMERGENCY_STOP] = "EmergencyStop";
+    
+    // 设备控制消息
+    message_type_names_[MessageIds::DEVICE_CONTROL] = "DeviceControl";
+    message_type_names_[MessageIds::DEVICE_STATUS] = "DeviceStatus";
+    message_type_names_[MessageIds::DEVICE_CONFIG] = "DeviceConfig";
+}
+
+// 初始化子消息类型名称映射
+void MessageFactory::InitializeSubMessageTypeNames() {
+    std::lock_guard<std::mutex> lock(factory_mutex_);
+    
+    // 系统阶段
+    sub_message_type_names_[SubMessageIds::IDLE] = "Idle";
+    sub_message_type_names_[SubMessageIds::INITIALIZING] = "Initializing";
+    sub_message_type_names_[SubMessageIds::CONNECTING] = "Connecting";
+    sub_message_type_names_[SubMessageIds::READY] = "Ready";
+    sub_message_type_names_[SubMessageIds::ERROR] = "Error";
+    
+    // 充电枪操作阶段
+    sub_message_type_names_[SubMessageIds::DEVICE_SELF_CHECK] = "DeviceSelfCheck";
+    sub_message_type_names_[SubMessageIds::COVER_OPERATION] = "CoverOperation";
+    sub_message_type_names_[SubMessageIds::TARGET_DETECTION] = "TargetDetection";
+    sub_message_type_names_[SubMessageIds::PATH_PLANNING] = "PathPlanning";
+    sub_message_type_names_[SubMessageIds::INSERTION] = "Insertion";
+    sub_message_type_names_[SubMessageIds::REMOVAL] = "Removal";
+    sub_message_type_names_[SubMessageIds::CONNECTION_VERIFICATION] = "ConnectionVerification";
+    sub_message_type_names_[SubMessageIds::COMPLETED] = "Completed";
+}
+
+// 初始化错误码描述映射
+void MessageFactory::InitializeErrorCodeDescriptions() {
+    std::lock_guard<std::mutex> lock(factory_mutex_);
+    
+    // 通用错误码
+    error_code_descriptions_[ErrorCodes::SUCCESS] = "成功";
+    error_code_descriptions_[ErrorCodes::GENERAL_ERROR] = "一般错误";
+    error_code_descriptions_[ErrorCodes::INVALID_PARAMETER] = "无效参数";
+    error_code_descriptions_[ErrorCodes::TIMEOUT] = "超时";
+    error_code_descriptions_[ErrorCodes::NOT_FOUND] = "未找到";
+    error_code_descriptions_[ErrorCodes::ALREADY_EXISTS] = "已存在";
+    error_code_descriptions_[ErrorCodes::PERMISSION_DENIED] = "权限拒绝";
+    error_code_descriptions_[ErrorCodes::RESOURCE_UNAVAILABLE] = "资源不可用";
+    
+    // 充电枪操作错误码
+    error_code_descriptions_[ErrorCodes::DEVICE_DISCONNECTED] = "设备未连接";
+    error_code_descriptions_[ErrorCodes::SELF_CHECK_FAILED] = "设备自检失败";
+    error_code_descriptions_[ErrorCodes::TARGET_RECOGNITION_FAILED] = "目标识别失败";
+    error_code_descriptions_[ErrorCodes::COVER_OPERATION_FAILED] = "保护盖操作失败";
+    error_code_descriptions_[ErrorCodes::PATH_PLANNING_FAILED] = "路径规划失败";
+    error_code_descriptions_[ErrorCodes::INSERTION_FAILED] = "插入定位失败";
+    error_code_descriptions_[ErrorCodes::REMOVAL_FAILED] = "拔出操作失败";
+    error_code_descriptions_[ErrorCodes::CONNECTION_FAILED] = "充电连接失败";
+}
+
+void MessageFactory::RegisterCreator(uint16_t message_id, Creator creator) {
+    std::lock_guard<std::mutex> lock(factory_mutex_);
+    creators_[message_id] = std::move(creator);
+}
+
+IMessage::Ptr MessageFactory::CreateMessage(MessageType message_type, uint16_t message_id, uint8_t sub_message_id) {
+    std::lock_guard<std::mutex> lock(factory_mutex_);
+    
+    auto it = creators_.find(message_id);
+    if (it != creators_.end()) {
+        return it->second();
     }
     
-    return oss.str();
+    // 默认创建基础消息
+    return std::make_shared<Message>(message_type, message_id, sub_message_id);
 }
 
-// 序列化实现
-std::vector<uint8_t> Message::Serialize() const {
-    return BuildFrame(frame_);
+IMessage::Ptr MessageFactory::CreateFromBytes(const std::vector<uint8_t>& data) {
+    if (!ValidateMessage(data)) {
+        return nullptr;
+    }
+    
+    auto frame = ParseFrame(data);
+    auto message = CreateMessage(static_cast<MessageType>(frame.message_type), 
+                               frame.message_id, frame.sub_message_id);
+    message->SetFrame(frame);
+    return message;
 }
 
-// 反序列化实现
-bool Message::Deserialize(const std::vector<uint8_t>& data) {
-    if (!ValidateFrame(data)) {
+bool MessageFactory::ValidateMessage(const std::vector<uint8_t>& data) {
+    if (data.size() < ProtocolFrame::MIN_FRAME_SIZE) {
         return false;
     }
     
-    frame_ = ParseFrame(data);
-    return true;
-}
-
-// 静态方法实现
-bool Message::ValidateFrame(const std::vector<uint8_t>& data) {
-    if (data.size() < 16) { // 最小帧长度
-        return false;
-    }
-    
-    // 检查魔数
-    uint32_t magic_id = static_cast<uint32_t>(data[0]) | 
-                       (static_cast<uint32_t>(data[1]) << 8) |
-                       (static_cast<uint32_t>(data[2]) << 16) |
-                       (static_cast<uint32_t>(data[3]) << 24);
+    // 检查魔数 (2字节)
+    uint16_t magic_id = static_cast<uint16_t>(data[0]) | 
+                       (static_cast<uint16_t>(data[1]) << 8);
     
     if (magic_id != ProtocolFrame::MAGIC_ID) {
         return false;
     }
     
-    // 检查CRC
-    uint16_t stored_crc = static_cast<uint16_t>(data[4]) | (static_cast<uint16_t>(data[5]) << 8);
-    uint16_t calculated_crc = CalculateCRC16(data.data() + 6, data.size() - 6);
+    // 检查CRC (位置在字节2-3)
+    uint16_t stored_crc = static_cast<uint16_t>(data[2]) | (static_cast<uint16_t>(data[3]) << 8);
+    uint16_t calculated_crc = CalculateCRC16(data.data() + 4, data.size() - 4);
     
     return stored_crc == calculated_crc;
 }
 
-uint16_t Message::CalculateCRC16(const std::vector<uint8_t>& data) {
+std::vector<uint8_t> MessageFactory::CreateHeartbeatMessage() {
+    // 创建符合协议帧格式的心跳消息
+    ProtocolFrame frame;
+    frame.magic_id = ProtocolFrame::MAGIC_ID;
+    frame.message_type = 0xFF; // 心跳消息类型
+    frame.message_id = 0xFFFF; // 心跳消息ID
+    frame.sub_message_id = 0xFF; // 心跳子消息ID
+    frame.sequence = 0;
+    frame.length = 17; // "HEARTBEAT" + 8字节时间戳
+    
+    // 心跳负载：统一心跳关键字 "HEARTBEAT" + 8字节时间戳（小端）
+    std::vector<uint8_t> payload = {'H','E','A','R','T','B','E','A','T'};
+    auto ts = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    for (int i = 0; i < 8; ++i) payload.push_back((ts >> (i * 8)) & 0xFF);
+    frame.payload = payload;
+    
+    return BuildFrame(frame);
+}
+
+uint16_t MessageFactory::CalculateCRC16(const std::vector<uint8_t>& data) {
     return CalculateCRC16(data.data(), data.size());
 }
 
-uint16_t Message::CalculateCRC16(const uint8_t* data, size_t length) {
+uint16_t MessageFactory::CalculateCRC16(const uint8_t* data, size_t length) {
     uint16_t crc = 0xFFFF;
     
     for (size_t i = 0; i < length; i++) {
@@ -132,43 +256,42 @@ uint16_t Message::CalculateCRC16(const uint8_t* data, size_t length) {
     return crc;
 }
 
-bool Message::VerifyCRC16(const std::vector<uint8_t>& data, uint16_t crc16) {
+bool MessageFactory::VerifyCRC16(const std::vector<uint8_t>& data, uint16_t crc16) {
     return CalculateCRC16(data) == crc16;
 }
 
-ProtocolFrame Message::ParseFrame(const std::vector<uint8_t>& data) {
+ProtocolFrame MessageFactory::ParseFrame(const std::vector<uint8_t>& data) {
     ProtocolFrame frame;
     
-    if (data.size() >= 16) {
+    if (data.size() >= ProtocolFrame::HEADER_SIZE) {
         frame.magic_id = static_cast<uint32_t>(data[0]) | 
                         (static_cast<uint32_t>(data[1]) << 8) |
                         (static_cast<uint32_t>(data[2]) << 16) |
                         (static_cast<uint32_t>(data[3]) << 24);
-        frame.crc16 = static_cast<uint16_t>(data[4]) | (static_cast<uint16_t>(data[5]) << 8);
-        frame.message_type = data[6];
-        frame.message_id = static_cast<uint16_t>(data[7]) | (static_cast<uint16_t>(data[8]) << 8);
-        frame.sub_message_id = data[9];
-        frame.sequence = static_cast<uint16_t>(data[10]) | (static_cast<uint16_t>(data[11]) << 8);
-        frame.length = static_cast<uint16_t>(data[12]) | (static_cast<uint16_t>(data[13]) << 8);
+        frame.crc16 = static_cast<uint16_t>(data[2]) | (static_cast<uint16_t>(data[3]) << 8);
+        frame.message_type = data[4];
+        frame.message_id = static_cast<uint16_t>(data[5]) | (static_cast<uint16_t>(data[6]) << 8);
+        frame.sub_message_id = data[7];
+        frame.sequence = static_cast<uint16_t>(data[8]) | (static_cast<uint16_t>(data[9]) << 8);
+        frame.length = static_cast<uint16_t>(data[10]) | (static_cast<uint16_t>(data[11]) << 8);
         
-        if (data.size() >= 16 + frame.length) {
-            frame.payload.assign(data.begin() + 16, data.begin() + 16 + frame.length);
+        if (data.size() >= ProtocolFrame::HEADER_SIZE + frame.length) {
+            frame.payload.assign(data.begin() + ProtocolFrame::HEADER_SIZE, 
+                               data.begin() + ProtocolFrame::HEADER_SIZE + frame.length);
         }
     }
     
     return frame;
 }
 
-std::vector<uint8_t> Message::BuildFrame(const ProtocolFrame& frame) {
+std::vector<uint8_t> MessageFactory::BuildFrame(const ProtocolFrame& frame) {
     std::vector<uint8_t> data;
     
-    // 添加帧头（除了CRC）
+    // 添加魔数 (2字节)
     data.push_back(static_cast<uint8_t>(frame.magic_id & 0xFF));
     data.push_back(static_cast<uint8_t>((frame.magic_id >> 8) & 0xFF));
-    data.push_back(static_cast<uint8_t>((frame.magic_id >> 16) & 0xFF));
-    data.push_back(static_cast<uint8_t>((frame.magic_id >> 24) & 0xFF));
     
-    // 预留CRC位置
+    // 预留CRC位置 (2字节)
     data.push_back(0);
     data.push_back(0);
     
@@ -185,140 +308,12 @@ std::vector<uint8_t> Message::BuildFrame(const ProtocolFrame& frame) {
     // 添加负载
     data.insert(data.end(), frame.payload.begin(), frame.payload.end());
     
-    // 计算并设置CRC
-    uint16_t crc = CalculateCRC16(data.data() + 6, data.size() - 6);
-    data[4] = static_cast<uint8_t>(crc & 0xFF);
-    data[5] = static_cast<uint8_t>((crc >> 8) & 0xFF);
+    // 计算并设置CRC (位置在字节2-3)
+    uint16_t crc = CalculateCRC16(data.data() + 4, data.size() - 4);
+    data[2] = static_cast<uint8_t>(crc & 0xFF);
+    data[3] = static_cast<uint8_t>((crc >> 8) & 0xFF);
     
     return data;
-}
-
-// RequestMessage实现
-RequestMessage::RequestMessage(uint16_t message_id, uint8_t sub_message_id)
-    : Message(1, message_id, sub_message_id) {
-}
-
-void RequestMessage::SetParameters(const std::vector<uint8_t>& params) {
-    SetRequestData(params);
-}
-
-std::vector<uint8_t> RequestMessage::GetParameters() const {
-    return GetRequestData();
-}
-
-void RequestMessage::SetRequestData(const std::vector<uint8_t>& data) {
-    SetPayload(data);
-}
-
-std::vector<uint8_t> RequestMessage::GetRequestData() const {
-    return GetPayload();
-}
-
-std::string RequestMessage::ToString() const {
-    std::ostringstream oss;
-    oss << "RequestMessage{id=" << GetMessageId() 
-        << ", sub_id=" << static_cast<int>(GetSubMessageId())
-        << ", data_size=" << GetPayload().size() << "}";
-    return oss.str();
-}
-
-// ResponseMessage实现
-ResponseMessage::ResponseMessage(uint16_t message_id, uint8_t sub_message_id)
-    : Message(2, message_id, sub_message_id), error_code_(0) {
-}
-
-void ResponseMessage::SetResult(const std::vector<uint8_t>& result) {
-    SetPayload(result);
-}
-
-std::vector<uint8_t> ResponseMessage::GetResult() const {
-    return GetPayload();
-}
-
-void ResponseMessage::SetErrorCode(uint16_t error_code) {
-    error_code_ = error_code;
-}
-
-uint16_t ResponseMessage::GetErrorCode() const {
-    return error_code_;
-}
-
-std::string ResponseMessage::ToString() const {
-    std::ostringstream oss;
-    oss << "ResponseMessage{id=" << GetMessageId() 
-        << ", sub_id=" << static_cast<int>(GetSubMessageId())
-        << ", error_code=" << error_code_
-        << ", data_size=" << GetPayload().size() << "}";
-    return oss.str();
-}
-
-// NotifyMessage实现
-NotifyMessage::NotifyMessage(uint16_t message_id, uint8_t sub_message_id)
-    : Message(3, message_id, sub_message_id) {
-}
-
-void NotifyMessage::SetNotificationData(const std::vector<uint8_t>& data) {
-    SetPayload(data);
-}
-
-std::vector<uint8_t> NotifyMessage::GetNotificationData() const {
-    return GetPayload();
-}
-
-std::string NotifyMessage::ToString() const {
-    std::ostringstream oss;
-    oss << "NotifyMessage{id=" << GetMessageId() 
-        << ", sub_id=" << static_cast<int>(GetSubMessageId())
-        << ", data_size=" << GetPayload().size() << "}";
-    return oss.str();
-}
-
-// MessageFactory实现
-std::unordered_map<uint16_t, MessageFactory::Creator> MessageFactory::creators_;
-std::unordered_map<uint16_t, std::string> MessageFactory::message_type_names_;
-std::unordered_map<uint8_t, std::string> MessageFactory::sub_message_type_names_;
-std::mutex MessageFactory::factory_mutex_;
-
-void MessageFactory::RegisterCreator(uint16_t message_id, Creator creator) {
-    std::lock_guard<std::mutex> lock(factory_mutex_);
-    creators_[message_id] = std::move(creator);
-}
-
-Message::Ptr MessageFactory::CreateMessage(uint8_t message_type, uint16_t message_id, uint8_t sub_message_id) {
-    std::lock_guard<std::mutex> lock(factory_mutex_);
-    
-    auto it = creators_.find(message_id);
-    if (it != creators_.end()) {
-        return it->second();
-    }
-    
-    // 默认创建基础消息
-    switch (message_type) {
-        case 1: // REQUEST
-            return std::make_shared<RequestMessage>(message_id, sub_message_id);
-        case 2: // RESPONSE
-            return std::make_shared<ResponseMessage>(message_id, sub_message_id);
-        case 3: // NOTIFY
-            return std::make_shared<NotifyMessage>(message_id, sub_message_id);
-        default:
-            return std::make_shared<Message>(message_type, message_id, sub_message_id);
-    }
-}
-
-Message::Ptr MessageFactory::CreateFromBytes(const std::vector<uint8_t>& data) {
-    if (data.size() < 3) {
-        return nullptr;
-    }
-    
-    uint16_t message_id = static_cast<uint16_t>(data[0]) | (static_cast<uint16_t>(data[1]) << 8);
-    uint8_t sub_message_id = data[2];
-    
-    auto message = CreateMessage(0, message_id, sub_message_id);
-    if (message && message->Deserialize(data)) {
-        return message;
-    }
-    
-    return nullptr;
 }
 
 std::string MessageFactory::GetMessageTypeName(uint16_t message_id) {
@@ -333,31 +328,54 @@ std::string MessageFactory::GetSubMessageTypeName(uint8_t sub_message_id) {
     return it != sub_message_type_names_.end() ? it->second : "Unknown";
 }
 
+std::string MessageFactory::GetErrorCodeDescription(uint16_t error_code) {
+    std::lock_guard<std::mutex> lock(factory_mutex_);
+    auto it = error_code_descriptions_.find(error_code);
+    return it != error_code_descriptions_.end() ? it->second : "未知错误";
+}
+
 // MessageRouter实现
-void MessageRouter::RegisterHandler(uint16_t message_id, MessageHandler::Ptr handler) {
-    std::lock_guard<std::mutex> lock(handlers_mutex_);
-    handlers_[message_id] = std::move(handler);
-}
-
-void MessageRouter::UnregisterHandler(uint16_t message_id) {
-    std::lock_guard<std::mutex> lock(handlers_mutex_);
-    handlers_.erase(message_id);
-}
-
-Message::Ptr MessageRouter::RouteMessage(const Message::Ptr& message) {
-    std::lock_guard<std::mutex> lock(handlers_mutex_);
-    
-    auto it = handlers_.find(message->GetMessageId());
-    if (it != handlers_.end()) {
-        return it->second->HandleMessage(message);
+class MessageRouter : public IMessageRouter {
+public:
+    void RegisterHandler(uint16_t message_id, IMessageHandler::Ptr handler) override {
+        std::lock_guard<std::mutex> lock(handlers_mutex_);
+        handlers_[message_id] = std::move(handler);
     }
-    
-    return nullptr;
-}
 
-bool MessageRouter::HasHandler(uint16_t message_id) const {
-    std::lock_guard<std::mutex> lock(handlers_mutex_);
-    return handlers_.find(message_id) != handlers_.end();
+    void UnregisterHandler(uint16_t message_id) override {
+        std::lock_guard<std::mutex> lock(handlers_mutex_);
+        handlers_.erase(message_id);
+    }
+
+    IMessage::Ptr RouteMessage(const IMessage::Ptr& message) override {
+        std::lock_guard<std::mutex> lock(handlers_mutex_);
+        
+        auto it = handlers_.find(message->GetMessageId());
+        if (it != handlers_.end()) {
+            return it->second->HandleMessage(message);
+        }
+        
+        return nullptr;
+    }
+
+    bool HasHandler(uint16_t message_id) const override {
+        std::lock_guard<std::mutex> lock(handlers_mutex_);
+        return handlers_.find(message_id) != handlers_.end();
+    }
+
+    size_t GetHandlerCount() const override {
+        std::lock_guard<std::mutex> lock(handlers_mutex_);
+        return handlers_.size();
+    }
+
+private:
+    std::unordered_map<uint16_t, IMessageHandler::Ptr> handlers_;
+    mutable std::mutex handlers_mutex_;
+};
+
+// 创建MessageRouter实例的工厂函数
+IMessageRouter::Ptr CreateMessageRouter() {
+    return std::make_shared<MessageRouter>();
 }
 
 } // namespace perception

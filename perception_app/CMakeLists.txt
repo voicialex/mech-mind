@@ -6,6 +6,7 @@ project(perception_app VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_BUILD_TYPE Debug)
 # 构建类型选项
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -92,14 +93,7 @@ set(INCLUDE_DIRS
 
 # 源文件定义
 set(SOURCES
-    runtime/core/CameraManager.cpp
-    runtime/core/utils/CVWindow.cpp
-    runtime/core/FrameSet.cpp
-    runtime/core/CameraInfo.cpp
-    runtime/core/InferenceManager.cpp
     runtime/configure/ConfigHelper.cpp
-    runtime/communication/CommunicationManager.cpp
-    runtime/communication/CommunicationInterface.cpp
     runtime/message/MessageProtocol.cpp
     inference/ExampleInference.cpp
 )
@@ -130,10 +124,13 @@ if(MECHEYEAPI_LIBRARY_DIRS)
     set(ENV{LD_LIBRARY_PATH} "${MECHEYEAPI_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
 endif()
 
-# 设置RPATH配置
+# 设置RPATH配置（持久化运行路径，包含thirdparty/lib）
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib;${MECHEYEAPI_LIBRARY_DIRS}")
+# 构建阶段RPATH：允许从构建产物和thirdparty目录直接运行
+set(CMAKE_BUILD_RPATH "${CMAKE_BINARY_DIR}/lib;${CMAKE_SOURCE_DIR}/thirdparty/lib")
+# 安装阶段RPATH：优先相对路径，其次安装lib与thirdparty路径
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib;${MECHEYEAPI_LIBRARY_DIRS};${CMAKE_SOURCE_DIR}/thirdparty/lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # 创建静态库
@@ -203,7 +200,7 @@ endif()
 
 # 链接库
 target_link_libraries(perception_app_lib ${TARGET_LIBRARIES})
-target_link_libraries(perception_app perception_app_lib)
+target_link_libraries(perception_app perception_app_lib camera)
 
 # 安装配置
 install(TARGETS perception_app_lib perception_app
@@ -224,9 +221,21 @@ install(DIRECTORY config/
 )
 
 # 添加Device Center子模块
-if(BUILD_DEVICE_CENTER)
-    add_subdirectory(device_center)
-endif()
+# if(BUILD_DEVICE_CENTER)
+#     add_subdirectory(device_center)
+# endif()
+
+# 添加Camera子模块
+add_subdirectory(runtime/camera)
+
+# 添加Message子模块
+add_subdirectory(runtime/message)
+
+# 添加Communication子模块
+add_subdirectory(runtime/communication)
+
+# 添加Adapter子模块
+add_subdirectory(runtime/adapter)
 
 # 打印构建信息
 message(STATUS "=== Build Summary ===")

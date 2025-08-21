@@ -1,8 +1,8 @@
-# 感知应用推理接口设计
+# 感知应用推理接口与集成（最终版）
 
 ## 概述
 
-本文档描述了感知应用的推理接口设计，该接口实现了推理算法与运行时框架的解耦合，支持本地和分布式推理，为感知应用提供了统一的推理能力。
+本文档基于当前实现重新梳理推理接口、运行时集成方式，以及与通信模块的边界关系。
 
 ## 设计目标
 
@@ -62,8 +62,7 @@
 ## 详细设计
 
 ### 1. 推理接口 (InferenceInterface)
-
-**核心接口定义:**
+位置：`inference/InferenceInterface.hpp`
 ```cpp
 class InferenceInterface {
 public:
@@ -109,39 +108,12 @@ public:
 ```
 
 ### 2. 推理管理器 (InferenceManager)
-
-**功能特性:**
-- 管理多个推理算法实例
-- 提供统一的推理接口
-- 支持算法切换和组合
-- 处理推理结果分发
-
-**主要功能:**
-```cpp
-class InferenceManager {
-public:
-    // 单例模式
-    static InferenceManager& GetInstance();
-    
-    // 算法管理
-    bool RegisterAlgorithm(const std::string& name, 
-                          std::shared_ptr<InferenceInterface> algorithm);
-    bool UnregisterAlgorithm(const std::string& name);
-    std::shared_ptr<InferenceInterface> GetAlgorithm(const std::string& name);
-    
-    // 推理处理
-    bool ProcessFrame(const FrameSet& frame_set, const std::string& algorithm_name = "");
-    std::string GetResult(const std::string& algorithm_name = "") const;
-    
-    // 状态管理
-    bool IsAlgorithmAvailable(const std::string& name) const;
-    std::vector<std::string> GetAvailableAlgorithms() const;
-};
-```
+位置：`inference/InferenceInterface.hpp` 与 `runtime/core/InferenceManager.cpp`
+职责：注册单个推理实现、初始化、处理帧、返回结果与清理。
+主要接口与当前实现一致：`RegisterInference/InitializeInference/Process/GetResult/Cleanup/IsInitialized`。
 
 ### 3. 帧数据结构 (FrameSet)
-
-**数据结构定义:**
+位置：`runtime/core/FrameSet.*`
 ```cpp
 struct FrameSet {
     // 彩色图像
@@ -200,7 +172,8 @@ struct InferenceResult {
 
 ## 算法实现示例
 
-### 1. 本地推理算法
+### 1. 本地推理算法（ExampleInference）
+文件：`inference/ExampleInference.*`
 
 ```cpp
 class ExampleInference : public InferenceInterface {
@@ -228,7 +201,8 @@ private:
 };
 ```
 
-### 2. 网络推理算法
+### 2. 网络推理算法（可选）
+如需分布式推理，可在实现内集成通信端点（`communication` 模块）进行请求/响应。
 
 ```cpp
 class NetworkInference : public InferenceInterface {
@@ -257,7 +231,7 @@ private:
 };
 ```
 
-## 配置管理
+## 配置与运行时集成
 
 ### 推理配置文件 (inference_config.json)
 
@@ -316,7 +290,29 @@ private:
 }
 ```
 
-## 使用示例
+## 使用与集成示例
+
+### 1. 在运行时启用推理（CameraManager）
+文件：`runtime/core/CameraManager.*`
+流程：`Init()` 中根据配置启用推理；`Capture()` 后调用 `ProcessInference()` 处理 `FrameSet`。
+
+```cpp
+// 创建并运行
+CameraManager cameraManager;
+cameraManager.Init();
+cameraManager.Connect();
+cameraManager.Start();
+```
+
+### 2. 独立使用 InferenceManager
+```cpp
+auto alg = std::make_shared<ExampleInference>();
+InferenceManager::getInstance().RegisterInference(alg);
+InferenceManager::getInstance().InitializeInference("config/example_inference.json");
+// 构造 FrameSet 后：
+InferenceManager::getInstance().Process(frame);
+auto result = InferenceManager::getInstance().GetResult();
+```
 
 ### 1. 基本使用
 

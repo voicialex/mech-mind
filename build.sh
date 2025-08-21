@@ -10,6 +10,31 @@ ENABLE_PCL=true      # 是否启用 PCL 功能
 ENABLE_HALCON=false  # 是否启用 Halcon 功能
 BUILD_TYPE="Release" # 构建类型: Debug/Release
 
+# 解析命令行参数
+CLEAN_BUILD=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -c|--clean)
+            CLEAN_BUILD=true
+            shift
+            ;;
+        -h|--help)
+            echo "用法: $0 [选项]"
+            echo "选项:"
+            echo "  -c, --clean    全量编译（清理构建目录）"
+            echo "  -h, --help     显示此帮助信息"
+            echo ""
+            echo "默认行为: 增量编译（保留构建目录）"
+            exit 0
+            ;;
+        *)
+            echo "未知参数: $1"
+            echo "使用 -h 查看帮助信息"
+            exit 1
+            ;;
+    esac
+done
+
 # 获取脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_ROOT="$SCRIPT_DIR"
@@ -27,6 +52,12 @@ echo "安装目录: $INSTALL_DIR"
 echo "PCL 支持: $ENABLE_PCL"
 echo "Halcon 支持: $ENABLE_HALCON"
 echo "构建类型: $BUILD_TYPE"
+
+if [[ "$CLEAN_BUILD" == "true" ]]; then
+    echo "构建模式: 全量编译（清理构建目录）"
+else
+    echo "构建模式: 增量编译（保留构建目录）"
+fi
 
 # 检查必要文件
 if [ ! -f "$SDK_ROOT/thirdparty/lib/pkgconfig/MechEyeApi.pc" ]; then
@@ -72,35 +103,66 @@ echo "创建输出目录..."
 mkdir -p "$BUILD_DIR"
 mkdir -p "$INSTALL_DIR"
 
-# 清理并创建构建目录
-if [ -d "$BUILD_DIR" ]; then
-    echo "清理构建目录: $BUILD_DIR"
-    rm -rf "$BUILD_DIR"
+# 根据构建模式处理构建目录
+if [[ "$CLEAN_BUILD" == "true" ]]; then
+    # 全量编译：清理并重新创建构建目录
+    if [ -d "$BUILD_DIR" ]; then
+        echo "清理构建目录: $BUILD_DIR"
+        rm -rf "$BUILD_DIR"
+    fi
+    mkdir -p "$BUILD_DIR"
+    echo "✓ 已清理构建目录，准备全量编译"
+else
+    # 增量编译：检查构建目录是否存在
+    if [ ! -d "$BUILD_DIR" ]; then
+        echo "构建目录不存在，创建新目录: $BUILD_DIR"
+        mkdir -p "$BUILD_DIR"
+    else
+        echo "✓ 使用现有构建目录进行增量编译"
+    fi
 fi
-mkdir -p "$BUILD_DIR"
+
 cd "$BUILD_DIR"
 
-# 配置 CMake
-echo "配置 CMake..."
-CMAKE_ARGS=(
-    -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-    -DUSE_OPENCV=ON
-    -DUSE_PCL=$USE_PCL
-    -DUSE_HALCON=$USE_HALCON
-    -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
-)
-
-# 如果启用 PCL，添加 LZ4 链接参数
-if [[ "$USE_PCL" == "ON" ]]; then
-    CMAKE_ARGS+=(
-        -DCMAKE_EXE_LINKER_FLAGS="-Wl,--no-as-needed -llz4"
-        -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-as-needed -llz4"
-    )
+# 检查是否需要重新配置 CMake
+NEED_RECONFIGURE=true
+if [[ "$CLEAN_BUILD" == "false" ]] && [ -f "CMakeCache.txt" ]; then
+    echo "检查 CMake 配置..."
+    # 检查关键配置是否发生变化
+    if grep -q "USE_PCL:BOOL=$USE_PCL" CMakeCache.txt 2>/dev/null && \
+       grep -q "USE_HALCON:BOOL=$USE_HALCON" CMakeCache.txt 2>/dev/null && \
+       grep -q "CMAKE_BUILD_TYPE:STRING=$BUILD_TYPE" CMakeCache.txt 2>/dev/null; then
+        echo "✓ CMake 配置未变化，跳过重新配置"
+        NEED_RECONFIGURE=false
+    else
+        echo "CMake 配置已变化，需要重新配置"
+    fi
 fi
 
-# 使用绝对路径指向源码目录
-SOURCE_DIR="$SDK_ROOT/perception_app"
-cmake "$SOURCE_DIR" "${CMAKE_ARGS[@]}"
+# 配置 CMake
+if [[ "$NEED_RECONFIGURE" == "true" ]]; then
+    echo "配置 CMake..."
+    CMAKE_ARGS=(
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        -DUSE_OPENCV=ON
+        -DUSE_PCL=$USE_PCL
+        -DUSE_HALCON=$USE_HALCON
+        -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
+    )
+
+    # 如果启用 PCL，添加 LZ4 链接参数
+    if [[ "$USE_PCL" == "ON" ]]; then
+        CMAKE_ARGS+=(
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--no-as-needed -llz4"
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-as-needed -llz4"
+        )
+    fi
+
+    # 使用绝对路径指向源码目录
+    SOURCE_DIR="$SDK_ROOT/perception_app"
+    cmake "$SOURCE_DIR" "${CMAKE_ARGS[@]}"
+    echo "✓ CMake 配置完成"
+fi
 
 # 编译
 echo "开始编译..."

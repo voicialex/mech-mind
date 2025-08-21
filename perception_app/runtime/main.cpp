@@ -1,4 +1,4 @@
-#include "core/CameraManager.hpp"
+#include "camera/CameraManager.hpp"
 #include "Logger.hpp"
 #include "configure/ConfigHelper.hpp"
 #include "InferenceInterface.hpp"
