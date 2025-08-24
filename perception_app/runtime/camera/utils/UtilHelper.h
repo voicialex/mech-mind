@@ -13,9 +13,12 @@ inline void printCameraInfo(const mmind::eye::CameraInfo &cameraInfo) {
   LOG_INFO_STREAM << "Serial number:                " << cameraInfo.serialNumber;
   LOG_INFO_STREAM << "IP address:                   " << cameraInfo.ipAddress;
   LOG_INFO_STREAM << "Subnet mask:                  " << cameraInfo.subnetMask;
-  LOG_INFO_STREAM << "IP address assignment method: " << mmind::eye::ipAssignmentMethodToString(cameraInfo.ipAssignmentMethod);
-  LOG_INFO_STREAM << "Hardware version:             " << "V" << cameraInfo.hardwareVersion.toString();
-  LOG_INFO_STREAM << "Firmware version:             " << "V" << cameraInfo.firmwareVersion.toString();
+  LOG_INFO_STREAM << "IP address assignment method: "
+                  << mmind::eye::ipAssignmentMethodToString(cameraInfo.ipAssignmentMethod);
+  LOG_INFO_STREAM << "Hardware version:             "
+                  << "V" << cameraInfo.hardwareVersion.toString();
+  LOG_INFO_STREAM << "Firmware version:             "
+                  << "V" << cameraInfo.firmwareVersion.toString();
   LOG_INFO_STREAM << ".............................";
   LOG_INFO_STREAM << std::endl;
 }

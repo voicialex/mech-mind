@@ -3,6 +3,7 @@
 #include "communication/endpoints/clients/EndpointClient.hpp"
 #include "communication/discovery/UdpServiceDiscovery.hpp"
 #include "communication/interfaces/ConnectionTypes.hpp"
+#include "message/IMessageProtocol.hpp"
 #include <memory>
 #include <string>
 #include <functional>
@@ -76,6 +77,22 @@ public:
      */
     std::shared_ptr<EndpointClient> GetControllerClient() const { return controller_client_; }
 
+    /**
+     * @brief 获取消息路由器实例
+     * @return 消息路由器指针
+     */
+    std::shared_ptr<MessageRouter> GetMessageRouter() const { return message_router_; }
+
+    /**
+     * @brief 注册消息回调函数
+     * @param message_type 消息类型
+     * @param message_id 消息ID
+     * @param sub_message_id 子消息ID
+     * @param callback 回调函数
+     */
+    void RegisterMessageCallback(MessageType message_type, uint16_t message_id, uint8_t sub_message_id, 
+                                MessageCallback callback);
+
 private:
     // 内部事件处理器（设备客户端）
     class DeviceClientEventHandler : public ITransport::EventHandler {
@@ -116,6 +133,9 @@ private:
     // 事件处理器
     std::shared_ptr<DeviceClientEventHandler> device_event_handler_;
     std::shared_ptr<ControllerClientEventHandler> controller_event_handler_;
+    
+    // 消息路由器
+    std::shared_ptr<MessageRouter> message_router_;
     
     // 状态管理
     bool initialized_ = false;

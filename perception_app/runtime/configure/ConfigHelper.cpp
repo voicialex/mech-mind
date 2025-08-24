@@ -3,7 +3,7 @@
 
 namespace {
 // 解析communication配置的通用函数（用于内联对象解析）
-static void ParseCommunicationJson(ConfigHelper::CommunicationConfig& cfg, const nlohmann::json& j) {
+static void ParseCommunicationJson(ConfigHelper::CommunicationConfig &cfg, const nlohmann::json &j) {
   if (j.contains("service_discovery")) {
     auto &sd = j["service_discovery"];
     cfg.service_discovery.local_address = sd.value("local_address", "0.0.0.0");
@@ -20,7 +20,6 @@ static void ParseCommunicationJson(ConfigHelper::CommunicationConfig& cfg, const
     cfg.server.port = server.value("port", 9090);
     cfg.server.max_clients = server.value("max_clients", 100);
     cfg.server.client_timeout = server.value("client_timeout", 30000);
-    cfg.server.heartbeat_interval = server.value("heartbeat_interval", 30000);
   }
 
   if (j.contains("client")) {
@@ -33,7 +32,14 @@ static void ParseCommunicationJson(ConfigHelper::CommunicationConfig& cfg, const
     cfg.client.max_reconnect_attempts = client.value("max_reconnect_attempts", 10);
     cfg.client.reconnect_interval = client.value("reconnect_interval", 5000);
     cfg.client.connection_check_interval = client.value("connection_check_interval", 10000);
-    cfg.client.heartbeat_interval = client.value("heartbeat_interval", 30000);
+  }
+
+  if (j.contains("heartbeat")) {
+    auto &heartbeat = j["heartbeat"];
+    cfg.heartbeat.enable = heartbeat.value("enable", true);
+    cfg.heartbeat.interval = heartbeat.value("interval", 30000);
+    cfg.heartbeat.timeout_multiplier = heartbeat.value("timeout_multiplier", 3);
+    cfg.heartbeat.max_missed_responses = heartbeat.value("max_missed_responses", 3);
   }
 
   if (j.contains("master_node")) {
@@ -42,7 +48,6 @@ static void ParseCommunicationJson(ConfigHelper::CommunicationConfig& cfg, const
     cfg.master_node.status_check_interval = master.value("status_check_interval", 10000);
     cfg.master_node.state_sync_interval = master.value("state_sync_interval", 5000);
     cfg.master_node.enable_auto_cleanup = master.value("enable_auto_cleanup", true);
-    cfg.master_node.enable_heartbeat = master.value("enable_heartbeat", true);
   }
 
   if (j.contains("message")) {
@@ -52,15 +57,23 @@ static void ParseCommunicationJson(ConfigHelper::CommunicationConfig& cfg, const
     cfg.message.enable_crc_check = message.value("enable_crc_check", true);
   }
 }
-} // namespace
+}  // namespace
 
-std::string ConfigHelper::CameraConfig::SaveConfig::save_2d_image_file(const std::string &suffix) const { return this->save_path + "/" + suffix + "_2DImage.png"; }
+std::string ConfigHelper::CameraConfig::SaveConfig::save_2d_image_file(const std::string &suffix) const {
+  return this->save_path + "/" + suffix + "_2DImage.png";
+}
 
-std::string ConfigHelper::CameraConfig::SaveConfig::save_depth_map_file(const std::string &suffix) const { return this->save_path + "/" + suffix + "_DepthMap.tiff"; }
+std::string ConfigHelper::CameraConfig::SaveConfig::save_depth_map_file(const std::string &suffix) const {
+  return this->save_path + "/" + suffix + "_DepthMap.tiff";
+}
 
-std::string ConfigHelper::CameraConfig::SaveConfig::save_point_cloud_file(const std::string &suffix) const { return this->save_path + "/" + suffix + "_PointCloud.ply"; }
+std::string ConfigHelper::CameraConfig::SaveConfig::save_point_cloud_file(const std::string &suffix) const {
+  return this->save_path + "/" + suffix + "_PointCloud.ply";
+}
 
-std::string ConfigHelper::CameraConfig::SaveConfig::save_textured_point_cloud_file(const std::string &suffix) const { return this->save_path + "/" + suffix + "_TexturedPointCloud.ply"; }
+std::string ConfigHelper::CameraConfig::SaveConfig::save_textured_point_cloud_file(const std::string &suffix) const {
+  return this->save_path + "/" + suffix + "_TexturedPointCloud.ply";
+}
 
 bool ConfigHelper::loadConfigFromJson(const std::string &configPath) {
   try {
@@ -76,7 +89,7 @@ bool ConfigHelper::loadConfigFromJson(const std::string &configPath) {
     // Parse camera config
     if (j.contains("camera_config")) {
       auto &camera = j["camera_config"];
-      
+
       // Parse render config
       if (camera.contains("render")) {
         auto &render = camera["render"];
@@ -94,7 +107,8 @@ bool ConfigHelper::loadConfigFromJson(const std::string &configPath) {
         camera_config_.capture.color_file = capture.value("color_file", "2DImage.png");
         camera_config_.capture.depth_file = capture.value("depth_file", "DepthMap.tiff");
         camera_config_.capture.point_cloud_file = capture.value("point_cloud_file", "PointCloud.ply");
-        camera_config_.capture.textured_point_cloud_file = capture.value("textured_point_cloud_file", "TexturedPointCloud.ply");
+        camera_config_.capture.textured_point_cloud_file =
+            capture.value("textured_point_cloud_file", "TexturedPointCloud.ply");
       }
 
       // Parse save config
@@ -189,7 +203,6 @@ bool ConfigHelper::loadCommunicationConfigFromJson(const std::string &configPath
       communication_config_.server.port = server.value("port", 9090);
       communication_config_.server.max_clients = server.value("max_clients", 100);
       communication_config_.server.client_timeout = server.value("client_timeout", 30000);
-      communication_config_.server.heartbeat_interval = server.value("heartbeat_interval", 30000);
     }
 
     // Parse client config
@@ -203,7 +216,15 @@ bool ConfigHelper::loadCommunicationConfigFromJson(const std::string &configPath
       communication_config_.client.max_reconnect_attempts = client.value("max_reconnect_attempts", 10);
       communication_config_.client.reconnect_interval = client.value("reconnect_interval", 5000);
       communication_config_.client.connection_check_interval = client.value("connection_check_interval", 10000);
-      communication_config_.client.heartbeat_interval = client.value("heartbeat_interval", 30000);
+    }
+
+    // Parse heartbeat config
+    if (j.contains("heartbeat")) {
+      auto &heartbeat = j["heartbeat"];
+      communication_config_.heartbeat.enable = heartbeat.value("enable", true);
+      communication_config_.heartbeat.interval = heartbeat.value("interval", 30000);
+      communication_config_.heartbeat.timeout_multiplier = heartbeat.value("timeout_multiplier", 3);
+      communication_config_.heartbeat.max_missed_responses = heartbeat.value("max_missed_responses", 3);
     }
 
     // Parse master node config
@@ -213,7 +234,6 @@ bool ConfigHelper::loadCommunicationConfigFromJson(const std::string &configPath
       communication_config_.master_node.status_check_interval = master.value("status_check_interval", 10000);
       communication_config_.master_node.state_sync_interval = master.value("state_sync_interval", 5000);
       communication_config_.master_node.enable_auto_cleanup = master.value("enable_auto_cleanup", true);
-      communication_config_.master_node.enable_heartbeat = master.value("enable_heartbeat", true);
     }
 
     // Parse message config
@@ -240,7 +260,8 @@ void ConfigHelper::printConfig() const {
   std::cout << "  Render:" << std::endl;
   std::cout << "    Enabled: " << (camera_config_.render.enable ? "Yes" : "No") << std::endl;
   std::cout << "    Window Title: " << camera_config_.render.window_title << std::endl;
-  std::cout << "    Window Size: " << camera_config_.render.window_width << "x" << camera_config_.render.window_height << std::endl;
+  std::cout << "    Window Size: " << camera_config_.render.window_width << "x" << camera_config_.render.window_height
+            << std::endl;
 
   std::cout << "  Capture:" << std::endl;
   std::cout << "    Enabled: " << (camera_config_.capture.enable ? "Yes" : "No") << std::endl;
@@ -255,7 +276,8 @@ void ConfigHelper::printConfig() const {
   std::cout << "    Save 2D Image: " << (camera_config_.save.save_2d_image ? "Yes" : "No") << std::endl;
   std::cout << "    Save Depth Map: " << (camera_config_.save.save_depth_map ? "Yes" : "No") << std::endl;
   std::cout << "    Save Point Cloud: " << (camera_config_.save.save_point_cloud ? "Yes" : "No") << std::endl;
-  std::cout << "    Save Textured Point Cloud: " << (camera_config_.save.save_textured_point_cloud ? "Yes" : "No") << std::endl;
+  std::cout << "    Save Textured Point Cloud: " << (camera_config_.save.save_textured_point_cloud ? "Yes" : "No")
+            << std::endl;
   std::cout << "    Max Save Count: " << camera_config_.save.max_save_count << std::endl;
 
   std::cout << "Log Config:" << std::endl;
@@ -277,33 +299,44 @@ void ConfigHelper::printCommunicationConfig() const {
   std::cout << "Service Discovery Config:" << std::endl;
   std::cout << "  Local Address: " << communication_config_.service_discovery.local_address << std::endl;
   std::cout << "  Discovery Port: " << communication_config_.service_discovery.discovery_port << std::endl;
-  std::cout << "  Broadcast Interval: " << communication_config_.service_discovery.broadcast_interval << "ms" << std::endl;
-  std::cout << "  Enable Broadcast: " << (communication_config_.service_discovery.enable_broadcast ? "Yes" : "No") << std::endl;
+  std::cout << "  Broadcast Interval: " << communication_config_.service_discovery.broadcast_interval << "ms"
+            << std::endl;
+  std::cout << "  Enable Broadcast: " << (communication_config_.service_discovery.enable_broadcast ? "Yes" : "No")
+            << std::endl;
 
   std::cout << "Server Config:" << std::endl;
   std::cout << "  ID: " << communication_config_.server.id << std::endl;
   std::cout << "  Name: " << communication_config_.server.name << std::endl;
-  std::cout << "  Address: " << communication_config_.server.address << ":" << communication_config_.server.port << std::endl;
+  std::cout << "  Address: " << communication_config_.server.address << ":" << communication_config_.server.port
+            << std::endl;
   std::cout << "  Max Clients: " << communication_config_.server.max_clients << std::endl;
   std::cout << "  Client Timeout: " << communication_config_.server.client_timeout << "ms" << std::endl;
-  std::cout << "  Heartbeat Interval: " << communication_config_.server.heartbeat_interval << "ms" << std::endl;
 
   std::cout << "Client Config:" << std::endl;
   std::cout << "  ID: " << communication_config_.client.id << std::endl;
   std::cout << "  Name: " << communication_config_.client.name << std::endl;
-  std::cout << "  Address: " << communication_config_.client.address << ":" << communication_config_.client.port << std::endl;
+  std::cout << "  Address: " << communication_config_.client.address << ":" << communication_config_.client.port
+            << std::endl;
   std::cout << "  Auto Reconnect: " << (communication_config_.client.enable_auto_reconnect ? "Yes" : "No") << std::endl;
   std::cout << "  Max Reconnect Attempts: " << communication_config_.client.max_reconnect_attempts << std::endl;
   std::cout << "  Reconnect Interval: " << communication_config_.client.reconnect_interval << "ms" << std::endl;
-  std::cout << "  Connection Check Interval: " << communication_config_.client.connection_check_interval << "ms" << std::endl;
-  std::cout << "  Heartbeat Interval: " << communication_config_.client.heartbeat_interval << "ms" << std::endl;
+  std::cout << "  Connection Check Interval: " << communication_config_.client.connection_check_interval << "ms"
+            << std::endl;
+
+  std::cout << "Heartbeat Config:" << std::endl;
+  std::cout << "  Enabled: " << (communication_config_.heartbeat.enable ? "Yes" : "No") << std::endl;
+  std::cout << "  Interval: " << communication_config_.heartbeat.interval << "ms" << std::endl;
+  std::cout << "  Timeout Multiplier: " << communication_config_.heartbeat.timeout_multiplier << std::endl;
+  std::cout << "  Max Missed Responses: " << communication_config_.heartbeat.max_missed_responses << std::endl;
 
   std::cout << "Master Node Config:" << std::endl;
-  std::cout << "  Client Timeout Interval: " << communication_config_.master_node.client_timeout_interval << "ms" << std::endl;
-  std::cout << "  Status Check Interval: " << communication_config_.master_node.status_check_interval << "ms" << std::endl;
+  std::cout << "  Client Timeout Interval: " << communication_config_.master_node.client_timeout_interval << "ms"
+            << std::endl;
+  std::cout << "  Status Check Interval: " << communication_config_.master_node.status_check_interval << "ms"
+            << std::endl;
   std::cout << "  State Sync Interval: " << communication_config_.master_node.state_sync_interval << "ms" << std::endl;
-  std::cout << "  Auto Cleanup: " << (communication_config_.master_node.enable_auto_cleanup ? "Yes" : "No") << std::endl;
-  std::cout << "  Enable Heartbeat: " << (communication_config_.master_node.enable_heartbeat ? "Yes" : "No") << std::endl;
+  std::cout << "  Auto Cleanup: " << (communication_config_.master_node.enable_auto_cleanup ? "Yes" : "No")
+            << std::endl;
 
   std::cout << "Message Config:" << std::endl;
   std::cout << "  Max Payload Size: " << communication_config_.message.max_payload_size << " bytes" << std::endl;

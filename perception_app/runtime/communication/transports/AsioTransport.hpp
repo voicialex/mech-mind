@@ -20,7 +20,7 @@ class AsioTransport : public ITransport {
 public:
     // 允许检查器访问内部统计
     friend class TransportInspector;
-    explicit AsioTransport(const EndpointConfig& config);
+    explicit AsioTransport(const EndpointIdentity& config);
     ~AsioTransport();
 
     // ITransport接口实现
@@ -100,7 +100,7 @@ private:
     std::shared_ptr<TcpConnection> GetConnection(const std::string& service_id) const;
 
 private:
-    EndpointConfig config_;
+    EndpointIdentity config_;
     std::atomic<bool> running_{false};
     
     // ASIO相关

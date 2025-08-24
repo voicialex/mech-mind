@@ -3,28 +3,44 @@
 #include "EndpointService.hpp"
 #include <string>
 #include <sstream>
+#include <iomanip>
 
 namespace perception {
 
+// 前向声明
+class EndpointServer;
+
 class ServiceInspector {
 public:
-	static std::string DumpText(const EndpointService& svc) {
-		std::ostringstream oss;
-		oss << "EndpointService Statistics:\n";
-		oss << "  State: " << static_cast<int>(svc.state_.load()) << "\n";
-		oss << "  Initialized: " << (svc.initialized_.load() ? "true" : "false") << "\n";
-		oss << "  Running: " << (svc.running_.load() ? "true" : "false") << "\n";
-		oss << "  Messages Sent: " << svc.statistics_.messages_sent.load() << "\n";
-		oss << "  Messages Received: " << svc.statistics_.messages_received.load() << "\n";
-		oss << "  Connections Established: " << svc.statistics_.connections_established.load() << "\n";
-		oss << "  Errors: " << svc.statistics_.errors.load() << "\n";
-		oss << "  Running Time: " << svc.statistics_.GetUptime() << " ms\n";
-		{
-			std::lock_guard<std::mutex> lock(svc.connections_mutex_);
-			oss << "  Active Connections: " << svc.endpoint_connections_.size() << "\n";
-		}
-		return oss.str();
-	}
+	/**
+	 * @brief 生成端点服务的完整统计信息
+	 * @param svc 端点服务实例
+	 * @return 格式化的统计信息字符串
+	 */
+	static std::string DumpText(const EndpointService& svc);
+	
+	/**
+	 * @brief 生成心跳统计信息
+	 * @param svc 端点服务实例
+	 * @return 格式化的心跳统计信息字符串
+	 */
+	static std::string GetHeartbeatStatistics(const EndpointService& svc);
+	
+	/**
+	 * @brief 检查客户端心跳是否正常
+	 * @param svc 端点服务实例
+	 * @param client_id 客户端ID
+	 * @return 心跳是否正常
+	 */
+	static bool IsClientHeartbeatAlive(const EndpointService& svc, const std::string& client_id);
+	
+	/**
+	 * @brief 获取客户端心跳信息
+	 * @param svc 端点服务实例
+	 * @param client_id 客户端ID
+	 * @return 心跳信息指针，如果不存在则返回nullptr
+	 */
+	static const void* GetClientHeartbeatInfo(const EndpointService& svc, const std::string& client_id);
 };
 
 } // namespace perception

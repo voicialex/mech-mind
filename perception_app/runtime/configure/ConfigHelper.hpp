@@ -76,7 +76,6 @@ public:
             uint16_t port = 9090;
             uint32_t max_clients = 100;
             uint32_t client_timeout = 30000; // 毫秒
-            uint32_t heartbeat_interval = 30000; // 毫秒
         } server;
 
         struct ClientConfig
@@ -89,8 +88,15 @@ public:
             uint32_t max_reconnect_attempts = 10;
             uint32_t reconnect_interval = 5000; // 毫秒
             uint32_t connection_check_interval = 10000; // 毫秒
-            uint32_t heartbeat_interval = 30000; // 毫秒
         } client;
+
+        struct HeartbeatConfig
+        {
+            bool enable = true;
+            uint32_t interval = 3000; // 毫秒
+            uint32_t timeout_multiplier = 3; // 超时倍数
+            uint32_t max_missed_responses = 3; // 最大未响应次数
+        } heartbeat;
 
         struct MasterNodeConfig
         {
@@ -98,7 +104,6 @@ public:
             uint32_t status_check_interval = 10000; // 状态检查间隔（毫秒）
             uint32_t state_sync_interval = 5000; // 状态同步间隔（毫秒）
             bool enable_auto_cleanup = true; // 是否启用自动清理离线客户端
-            bool enable_heartbeat = true; // 是否启用心跳机制
         } master_node;
 
         struct MessageConfig

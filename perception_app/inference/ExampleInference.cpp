@@ -4,7 +4,13 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 
-ExampleInference::ExampleInference() : is_initialized_(false), last_result_("No result available"), processed_frame_count_(0), confidence_threshold_(0.5), min_object_size_(100), model_path_("") {}
+ExampleInference::ExampleInference()
+    : is_initialized_(false),
+      last_result_("No result available"),
+      processed_frame_count_(0),
+      confidence_threshold_(0.5),
+      min_object_size_(100),
+      model_path_("") {}
 
 ExampleInference::~ExampleInference() { Cleanup(); }
 
@@ -45,7 +51,8 @@ bool ExampleInference::Initialize(const std::string &config_path) {
     last_result_ = "Initialized successfully";
 
     LOG_INFO_STREAM << "ExampleInference initialized successfully";
-    LOG_INFO_STREAM << "Config: confidence_threshold=" << confidence_threshold_ << ", min_object_size=" << min_object_size_ << ", model_path=" << model_path_;
+    LOG_INFO_STREAM << "Config: confidence_threshold=" << confidence_threshold_
+                    << ", min_object_size=" << min_object_size_ << ", model_path=" << model_path_;
 
     return true;
   } catch (const std::exception &e) {
@@ -144,7 +151,8 @@ std::string ExampleInference::ProcessDepthImage(const cv::Mat &depth_image) {
   int valid_pixels = cv::countNonZero(valid_mask);
 
   std::stringstream result;
-  result << "Size: " << depth_image.size() << ", Min: " << min_val << ", Max: " << max_val << ", Valid pixels: " << valid_pixels;
+  result << "Size: " << depth_image.size() << ", Min: " << min_val << ", Max: " << max_val
+         << ", Valid pixels: " << valid_pixels;
 
   return result.str();
 }
@@ -177,7 +185,8 @@ std::string ExampleInference::ProcessPointCloud(const mmind::eye::PointCloud &po
   }
 
   std::stringstream result;
-  result << "Points: " << point_count << ", BBox: [" << min_x << "," << min_y << "," << min_z << "] to [" << max_x << "," << max_y << "," << max_z << "]";
+  result << "Points: " << point_count << ", BBox: [" << min_x << "," << min_y << "," << min_z << "] to [" << max_x
+         << "," << max_y << "," << max_z << "]";
 
   return result.str();
 }

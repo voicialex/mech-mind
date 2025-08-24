@@ -13,7 +13,7 @@ SortIncludes: Never
 # AllowShortFunctionsOnASingleLine: Empty
 # AlwaysBreakTemplateDeclarations: Yes
 # BreakBeforeBraces: Allman
-ColumnLimit: 200
+ColumnLimit: 120
 # SpaceAfterCStyleCast: false
 # SpaceBeforeParens: ControlStatements
 # SpaceInEmptyParentheses: false

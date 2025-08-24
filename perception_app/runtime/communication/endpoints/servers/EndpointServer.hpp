@@ -1,6 +1,7 @@
 #pragma once
 
 #include "communication/endpoints/services/EndpointService.hpp"
+#include "communication/endpoints/services/ServiceInspector.hpp"
 #include "communication/interfaces/ConnectionTypes.hpp"
 #include <memory>
 #include <functional>
@@ -30,7 +31,7 @@ public:
 	using EventHandler = IEndpointService::EventHandler;
 
 public:
-	explicit EndpointServer(const EndpointConfig& config);
+	explicit EndpointServer(const EndpointIdentity& config);
 	~EndpointServer() override;
 
 	// 服务器特有的客户端管理方法
@@ -88,6 +89,19 @@ public:
 	 * @return 是否在线
 	 */
 	bool IsClientOnline(const std::string& client_id) const;
+	
+	/**
+	 * @brief 检查客户端心跳是否正常
+	 * @param client_id 客户端ID
+	 * @return 心跳是否正常
+	 */
+	bool IsClientHeartbeatAlive(const std::string& client_id) const;
+	
+	/**
+	 * @brief 获取客户端心跳统计信息
+	 * @return 心跳统计信息
+	 */
+	std::string GetHeartbeatStatistics() const;
 
 	/**
 	 * @brief 发送消息给客户端
@@ -132,16 +146,29 @@ public:
 	void BroadcastMessage(const std::vector<uint8_t>& message_data, 
 	                    const std::string& target_name = "") override;
 	
+	// 心跳支持实现
+	void EnableHeartbeat(bool enable) override;
+	bool IsHeartbeatEnabled() const override;
+	
+	// 心跳处理纯虚函数实现
+	void OnHeartbeatRequest(std::shared_ptr<ITransport> transport, const std::string& endpoint_id, 
+                               uint16_t message_id, uint8_t sub_message_id, const std::vector<uint8_t>& payload) override;
+	void OnHeartbeatResponse(std::shared_ptr<ITransport> transport, const std::string& endpoint_id, 
+                                uint16_t message_id, uint8_t sub_message_id, const std::vector<uint8_t>& payload) override;
+	
+	// 心跳管理方法
+	void StartHeartbeatMonitor();
+	void StopHeartbeatMonitor();
+	void SendHeartbeatRequest(const std::string& target_id);
+	const ClientHeartbeatInfo* GetClientHeartbeatInfo(const std::string& client_id) const;
+	std::unordered_map<std::string, ClientHeartbeatInfo> GetAllClientHeartbeatInfo() const;
+	
 	// 统计接口与时间接口复用基类
 
 private:
 	// 私有方法
 	void CleanupOfflineClients();
-	void ProcessClientHeartbeats();
 	uint64_t GetCurrentTimestamp() const;
-	bool IsHeartbeatMessage(const std::vector<uint8_t>& message_data) const;
-	void StartMonitorThread();
-	void StopMonitorThread();
 
 	// 内部事件处理器：先维护内部状态，再转发给用户处理器
 	class InternalServerEventHandler : public IEndpointService::EventHandler {
@@ -163,10 +190,13 @@ private:
 
 	// 外部（用户）事件处理器
 	EventHandler::Ptr user_handler_;
-
-	// 心跳监控线程
-	std::thread monitor_thread_;
-	std::atomic<bool> monitor_running_{false};
+	
+	// 心跳相关
+	std::atomic<bool> heartbeat_enabled_{false};
+	std::thread heartbeat_monitor_thread_;
+	std::atomic<bool> heartbeat_monitor_running_{false};
+	std::unordered_map<std::string, ClientHeartbeatInfo> client_heartbeat_info_;
+	mutable std::mutex heartbeat_info_mutex_;
 };
 
 } // namespace perception

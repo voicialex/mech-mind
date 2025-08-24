@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../interfaces/ITransport.hpp"
+#include "communication/interfaces/ITransport.hpp"
 #include <asio.hpp>
 #include <memory>
 #include <unordered_map>

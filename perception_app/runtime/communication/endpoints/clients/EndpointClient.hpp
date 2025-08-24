@@ -28,7 +28,7 @@ public:
 	using EventHandler = IEndpointService::EventHandler;
 
 public:
-	explicit EndpointClient(const EndpointConfig& config);
+	explicit EndpointClient(const EndpointIdentity& config);
 	~EndpointClient() override;
 
 	// 客户端特有的连接方法
@@ -85,20 +85,25 @@ public:
 	bool Start() override;
 	void Stop() override;
 	void Cleanup() override;
+	
+	// 心跳支持实现
+	void EnableHeartbeat(bool enable) override;
+	bool IsHeartbeatEnabled() const override;
+	
+	// 心跳处理纯虚函数实现
+	        void OnHeartbeatRequest(std::shared_ptr<ITransport> transport, const std::string& endpoint_id, 
+                               uint16_t message_id, uint8_t sub_message_id, const std::vector<uint8_t>& payload) override;
+        void OnHeartbeatResponse(std::shared_ptr<ITransport> transport, const std::string& endpoint_id, 
+                                uint16_t message_id, uint8_t sub_message_id, const std::vector<uint8_t>& payload) override;
 
 private:
 	// 私有方法
 	void AutoReconnect();
-	void SendHeartbeat();
 	void StartConnectionMonitor();
 	void StopConnectionMonitor();
-	void StartHeartbeat();
-	void StopHeartbeat();
 	void ConnectionMonitorLoop();
-	void HeartbeatLoop();
 	bool TryConnectToServer();
 	void ResetReconnectAttempts();
-	bool IsHeartbeatMessage(const std::vector<uint8_t>& message_data) const;
 
 	// 内部事件处理器：先维护内部状态，再转发给用户处理器
 	class InternalClientEventHandler : public IEndpointService::EventHandler {
@@ -121,11 +126,12 @@ private:
 	// 重连相关
 	std::atomic<bool> reconnect_enabled_{false};
 	std::atomic<uint64_t> last_connection_attempt_{0};
-	std::atomic<uint64_t> last_heartbeat_{0};
+	
+	// 心跳相关
+	std::atomic<bool> heartbeat_enabled_{false};
 	
 	// 监控线程
 	std::thread connection_monitor_thread_;
-	std::thread heartbeat_thread_;
 	std::atomic<bool> monitor_running_{false};
 
 	// 外部（用户）事件处理器

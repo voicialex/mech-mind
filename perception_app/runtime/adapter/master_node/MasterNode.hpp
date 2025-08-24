@@ -1,8 +1,10 @@
 #pragma once
 
 #include "communication/endpoints/servers/EndpointServer.hpp"
+#include "communication/endpoints/services/ServiceInspector.hpp"
 #include "communication/discovery/UdpServiceDiscovery.hpp"
 #include "communication/interfaces/ConnectionTypes.hpp"
+#include "message/IMessageProtocol.hpp"
 #include "Logger.hpp"
 #include <memory>
 #include <string>
@@ -33,7 +35,7 @@ public:
 	using Ptr = std::shared_ptr<MasterNode>;
 	
 	/**
-	 * @brief Master节点配置 - 基于统一的EndpointConfig
+	 * @brief Master节点配置 - 基于统一的EndpointIdentity
 	 */
 	struct Config {
 		// 服务发现配置
@@ -41,8 +43,8 @@ public:
 		uint16_t discovery_port = 8080;
 		uint32_t broadcast_interval = 5000; // 毫秒
 		
-		// 设备服务器端点配置（使用统一的EndpointConfig）
-		EndpointConfig device_server_config;
+		// 设备服务器端点配置（使用统一的EndpointIdentity）
+		EndpointIdentity device_server_config;
 		
 		// 客户端状态监控配置
 		uint32_t client_timeout_interval = 60000;      // 客户端超时时间（毫秒）
@@ -58,8 +60,6 @@ public:
 			device_server_config.address = "127.0.0.1";
 			device_server_config.port = 9090;
 			device_server_config.type = EndpointType::Server;
-			device_server_config.max_clients = 100;
-			device_server_config.client_timeout = 30000;
 		}
 	};
 
@@ -157,6 +157,45 @@ public:
 	 * @return 服务器指针
 	 */
 	std::shared_ptr<EndpointServer> GetServer() const { return server_; }
+	
+	/**
+	 * @brief 获取消息路由器实例
+	 * @return 消息路由器指针
+	 */
+	std::shared_ptr<MessageRouter> GetMessageRouter() const { return message_router_; }
+	
+	/**
+	 * @brief 注册消息回调函数
+	 * @param message_type 消息类型
+	 * @param message_id 消息ID
+	 * @param sub_message_id 子消息ID
+	 * @param callback 回调函数
+	 */
+	void RegisterMessageCallback(MessageType message_type, uint16_t message_id, uint8_t sub_message_id, 
+	                            MessageCallback callback);
+	
+	/**
+	 * @brief 获取心跳统计信息（使用 ServiceInspector）
+	 * @return 心跳统计信息字符串
+	 */
+	std::string GetHeartbeatStatistics() const {
+		if (!server_) {
+			return "Server not available";
+		}
+		return ServiceInspector::GetHeartbeatStatistics(*server_);
+	}
+	
+	/**
+	 * @brief 检查客户端心跳是否正常（使用 ServiceInspector）
+	 * @param client_id 客户端ID
+	 * @return 心跳是否正常
+	 */
+	bool IsClientHeartbeatAlive(const std::string& client_id) const {
+		if (!server_) {
+			return false;
+		}
+		return ServiceInspector::IsClientHeartbeatAlive(*server_, client_id);
+	}
 
 private:
 	// 内部事件处理器适配器（直接处理事件并维护客户端状态）
@@ -167,6 +206,20 @@ private:
 		void OnMessageReceived(const std::string& endpoint_id, const std::vector<uint8_t>& message_data) override {
 			LOG_DEBUG_STREAM << "[RX] Master收到消息 <- 端点: " << endpoint_id
 							<< ", size=" << message_data.size();
+			
+			// 使用 MessageFactory 和 MessageRouter 自动解析和处理消息
+			if (node_->message_router_) {
+				try {
+					auto message = MessageFactory::CreateFromBytes(message_data);
+					if (message) {
+						// 统一使用 message->ProcessMessage 进行处理
+						message->ProcessMessage(nullptr, node_->message_router_);
+					}
+				} catch (const std::exception& e) {
+					LOG_ERROR_STREAM << "[Master] 消息处理异常: " << e.what();
+				}
+			}
+			
 			// 统一由EndpointService层识别心跳并维护统计，这里只维护活动时间
 			node_->UpdateClientActivity(endpoint_id);
 		}
@@ -237,6 +290,9 @@ private:
 	
 	// 事件处理器
 	std::shared_ptr<MasterNodeEventHandler> event_handler_;
+	
+	// 消息路由器
+	std::shared_ptr<MessageRouter> message_router_;
 	
 	// 客户端状态管理（使用统一的ConnectionInfo）
 	mutable std::mutex clients_mutex_;

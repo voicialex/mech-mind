@@ -6,7 +6,8 @@
 #include <area_scan_3d_camera/Frame2DAnd3D.h>
 #include <cmath>
 
-FrameSet::FrameSet(const mmind::eye::Frame2DAnd3D &frame, const std::string &suffix) : frame2DAnd3D(frame), suffix(suffix) {
+FrameSet::FrameSet(const mmind::eye::Frame2DAnd3D &frame, const std::string &suffix)
+    : frame2DAnd3D(frame), suffix(suffix) {
   mmind::eye::Color2DImage colorImage = frame.frame2D().getColorImage();
   color = cv::Mat(colorImage.height(), colorImage.width(), CV_8UC3, colorImage.data());
   hasColor = true;
@@ -22,7 +23,8 @@ void FrameSet::DecodeFrame() {
 
   processPointCloud(CameraInfo::getInstance().transformation_);
 
-  convertDepthToPointCloud(frame2DAnd3D.frame3D().getDepthMap(), CameraInfo::getInstance().cameraIntrinsics_, pointCloudFromDepth);
+  convertDepthToPointCloud(frame2DAnd3D.frame3D().getDepthMap(), CameraInfo::getInstance().cameraIntrinsics_,
+                           pointCloudFromDepth);
   hasPointCloudFromDepth = true;
 }
 
@@ -35,8 +37,10 @@ cv::Mat FrameSet::renderDepthData(const cv::Mat &depth) {
   cv::minMaxLoc(depth, &minDepthValue, &maxDepthValue, nullptr, nullptr, mask);
 
   cv::Mat depth8U;
-  isApprox0(maxDepthValue - minDepthValue) ? depth.convertTo(depth8U, CV_8UC1)
-                                           : depth.convertTo(depth8U, CV_8UC1, (255.0 / (minDepthValue - maxDepthValue)), (((maxDepthValue * 255.0) / (maxDepthValue - minDepthValue)) + 1));
+  isApprox0(maxDepthValue - minDepthValue)
+      ? depth.convertTo(depth8U, CV_8UC1)
+      : depth.convertTo(depth8U, CV_8UC1, (255.0 / (minDepthValue - maxDepthValue)),
+                        (((maxDepthValue * 255.0) / (maxDepthValue - minDepthValue)) + 1));
 
   if (depth8U.empty()) return cv::Mat();
 
@@ -56,24 +60,30 @@ void FrameSet::processPointCloud(mmind::eye::FrameTransformation transformation)
   pointCloud = mmind::eye::transformPointCloud(transformation, frame2DAnd3D.frame3D().getUntexturedPointCloud());
   hasPointCloud = true;
 
-  pointCloudWithNormals = mmind::eye::transformPointCloudWithNormals(transformation, frame2DAnd3D.frame3D().getUntexturedPointCloud());
+  pointCloudWithNormals =
+      mmind::eye::transformPointCloudWithNormals(transformation, frame2DAnd3D.frame3D().getUntexturedPointCloud());
   hasPointCloudWithNormals = true;
 
   texturedPointCloud = mmind::eye::transformTexturedPointCloud(transformation, frame2DAnd3D.getTexturedPointCloud());
   hasTexturedPointCloud = true;
 
-  texturedPointCloudWithNormals = mmind::eye::transformTexturedPointCloudWithNormals(transformation, frame2DAnd3D.getTexturedPointCloud());
+  texturedPointCloudWithNormals =
+      mmind::eye::transformTexturedPointCloudWithNormals(transformation, frame2DAnd3D.getTexturedPointCloud());
   hasTexturedPointCloudWithNormals = true;
 }
 
-void FrameSet::convertDepthToPointCloud(const mmind::eye::DepthMap &depth, const mmind::eye::CameraIntrinsics &intrinsics, mmind::eye::PointCloud &pointCloud) {
+void FrameSet::convertDepthToPointCloud(const mmind::eye::DepthMap &depth,
+                                        const mmind::eye::CameraIntrinsics &intrinsics,
+                                        mmind::eye::PointCloud &pointCloud) {
   pointCloud.resize(depth.width(), depth.height());
 
   for (int i = 0; i < depth.width() * depth.height(); i++) {
     const unsigned row = i / depth.width();
     const unsigned col = i - row * depth.width();
     pointCloud[i].z = depth[i].z;
-    pointCloud[i].x = static_cast<float>(pointCloud[i].z * (col - intrinsics.depth.cameraMatrix.cx) / intrinsics.depth.cameraMatrix.fx);
-    pointCloud[i].y = static_cast<float>(pointCloud[i].z * (row - intrinsics.depth.cameraMatrix.cy) / intrinsics.depth.cameraMatrix.fy);
+    pointCloud[i].x = static_cast<float>(pointCloud[i].z * (col - intrinsics.depth.cameraMatrix.cx) /
+                                         intrinsics.depth.cameraMatrix.fx);
+    pointCloud[i].y = static_cast<float>(pointCloud[i].z * (row - intrinsics.depth.cameraMatrix.cy) /
+                                         intrinsics.depth.cameraMatrix.fy);
   }
 }

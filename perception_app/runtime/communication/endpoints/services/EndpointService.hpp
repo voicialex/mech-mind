@@ -6,6 +6,7 @@
 #include <memory>
 #include <atomic>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -78,7 +79,7 @@ public:
      * @brief 构造函数
      * @param config 端点配置
      */
-    explicit EndpointService(const EndpointConfig& config);
+    explicit EndpointService(const EndpointIdentity& config);
 
     /**
      * @brief 析构函数
@@ -146,13 +147,13 @@ public:
      * @brief 获取配置
      * @return 配置
      */
-    const EndpointConfig& GetConfig() const override;
+    const EndpointIdentity& GetConfig() const override;
 
     /**
      * @brief 获取服务配置（兼容性方法）
      * @return 服务配置
      */
-    const EndpointConfig& GetServiceConfig() const { return config_; }
+    const EndpointIdentity& GetServiceConfig() const { return config_; }
 
     /**
      * @brief 检查是否正在运行
@@ -204,76 +205,45 @@ protected:
     bool IsConnected(const std::string& endpoint_id) const;
     std::vector<std::string> GetConnectedEndpoints() const;
     
-    // 消息处理
-    bool ProcessIncomingMessage(const std::string& endpoint_id, const std::vector<uint8_t>& data);
-    bool ProcessOutgoingMessage(const std::string& target_id, const std::vector<uint8_t>& data);
+
     
-    // 心跳支持
-    void EnableHeartbeat(bool enable) { enable_heartbeat_ = enable; }
-    bool IsHeartbeatEnabled() const { return enable_heartbeat_; }
-    bool IsHeartbeatMessage(const std::vector<uint8_t>& message_data) const;
+    // 心跳支持（子类实现）
+    virtual void EnableHeartbeat(bool enable) = 0;
+    virtual bool IsHeartbeatEnabled() const = 0;
     
-    // 消息路由器访问
-    std::shared_ptr<IMessageRouter> GetMessageRouter() const { return message_router_; }
+    // 消息路由器支持
+    void RegisterHeartbeatCallbacks();
+    void UnregisterHeartbeatCallbacks();
+    std::shared_ptr<MessageRouter> GetMessageRouter() const { return message_router_; }
+    
+    // 心跳处理纯虚函数（子类实现具体逻辑）
+    virtual void OnHeartbeatRequest(std::shared_ptr<ITransport> transport, const std::string& endpoint_id, 
+                                   uint16_t message_id, uint8_t sub_message_id, const std::vector<uint8_t>& payload) = 0;
+    virtual void OnHeartbeatResponse(std::shared_ptr<ITransport> transport, const std::string& endpoint_id, 
+                                    uint16_t message_id, uint8_t sub_message_id, const std::vector<uint8_t>& payload) = 0;
+    
     
     // 统计信息访问
     EndpointStatistics& GetStatistics() { return statistics_; }
-
-private:
-    /**
-     * @brief 私有方法
-     */
-    void InitializeMessageProtocol();
-    void InitializeMessageRouter();
-    
-    void OnMessageReceived(const std::string& service_id, const std::vector<uint8_t>& data);
-    void OnConnectionChanged(const std::string& service_id, bool connected, const ConnectionInfo& connection_info);
-    void OnError(const std::string& service_id, uint16_t error_code, const std::string& error_message);
 
 protected:
     /**
      * @brief 配置和状态
      */
-    EndpointConfig config_;
+    EndpointIdentity config_;
     std::atomic<EndpointState> state_{EndpointState::Stopped};
     std::atomic<bool> initialized_{false};
     std::atomic<bool> running_{false};
     
     // 底层服务
     std::shared_ptr<ITransport> transport_;
-    std::shared_ptr<IMessageRouter> message_router_;
     
     // 统一的事件处理器
     EventHandler::Ptr event_handler_;
     
-    // 内部事件处理器 - 直接传递事件
-    class InternalEventHandler : public ITransport::EventHandler {
-    public:
-        explicit InternalEventHandler(EndpointService* service) : service_(service) {}
-        
-        void OnMessageReceived(const std::string& endpoint_id, const std::vector<uint8_t>& message_data) override {
-            if (service_) {
-                service_->OnMessageReceived(endpoint_id, message_data);
-            }
-        }
-        
-        void OnConnectionChanged(const std::string& endpoint_id, bool connected, const ConnectionInfo& connection_info) override {
-            if (service_) {
-                service_->OnConnectionChanged(endpoint_id, connected, connection_info);
-            }
-        }
-        
-        void OnError(const std::string& endpoint_id, uint16_t error_code, const std::string& error_message) override {
-            if (service_) {
-                service_->OnError(endpoint_id, error_code, error_message);
-            }
-        }
-        
-    private:
-        EndpointService* service_;
-    };
-    
-    std::shared_ptr<InternalEventHandler> internal_event_handler_;
+    // 内部事件处理器声明
+    class InternalEventHandler;
+    std::shared_ptr<ITransport::EventHandler> internal_event_handler_;
     
     // 状态管理
     std::unordered_map<std::string, bool> endpoint_connections_;
@@ -282,8 +252,39 @@ protected:
     // 统一的统计信息
     EndpointStatistics statistics_;
     
-    // 心跳相关（可选）
-    bool enable_heartbeat_ = false;
+    // 消息路由器
+    std::shared_ptr<MessageRouter> message_router_;
+    
+    // 当前正在处理的端点ID（用于回调函数获取发送者ID）
+    std::string current_processing_endpoint_id_;
+    
+public:
+    // 客户端心跳信息结构体
+    struct ClientHeartbeatInfo {
+        uint64_t last_request_time{0};      // 最后发送心跳请求的时间
+        uint64_t last_response_time{0};     // 最后收到心跳响应的时间
+        uint32_t consecutive_missed{0};     // 连续未响应次数
+        uint32_t total_requests{0};         // 总请求数
+        uint32_t total_responses{0};        // 总响应数
+        bool is_alive{true};               // 是否存活
+        
+        // 获取响应率
+        double GetResponseRate() const {
+            return total_requests > 0 ? static_cast<double>(total_responses) / total_requests : 0.0;
+        }
+        
+        // 获取最后活动时间
+        uint64_t GetLastActivity() const {
+            return std::max(last_request_time, last_response_time);
+        }
+        
+        // 比较操作符（用于排序）
+        bool operator<(const ClientHeartbeatInfo& other) const {
+            return GetLastActivity() < other.GetLastActivity();
+        }
+    };
+    
+
 };
 
 } // namespace perception

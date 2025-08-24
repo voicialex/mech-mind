@@ -104,14 +104,51 @@ format_code() {
     echo ""
 }
 
+# Parse .arclint configuration
+parse_arclint_config() {
+    if [ ! -f ".arclint" ]; then
+        echo -e "${RED}Error: .arclint file not found${NC}"
+        return 1
+    fi
+    
+    # Extract linelength from .arclint (simple parsing)
+    LINELENGTH=$(grep -o '"linelength":[0-9]*' .arclint | grep -o '[0-9]*' || echo "120")
+    echo -e "${CYAN}Line length limit: $LINELENGTH${NC}"
+    
+    # Build filter string from disabled rules
+    FILTER_PARTS=()
+    if grep -q '"build/c++11": "disabled"' .arclint; then
+        FILTER_PARTS+=("-build/c++11")
+    fi
+    if grep -q '"build/include_order": "disabled"' .arclint; then
+        FILTER_PARTS+=("-build/include_order")
+    fi
+    if grep -q '"runtime/references": "disabled"' .arclint; then
+        FILTER_PARTS+=("-runtime/references")
+    fi
+    if grep -q '"legal/copyright": "disabled"' .arclint; then
+        FILTER_PARTS+=("-legal/copyright")
+    fi
+    if grep -q '"whitespace/line_length": "disabled"' .arclint; then
+        FILTER_PARTS+=("-whitespace/line_length")
+    fi
+    
+    # Join filter parts
+    if [ ${#FILTER_PARTS[@]} -gt 0 ]; then
+        FILTER=$(IFS=','; echo "${FILTER_PARTS[*]}")
+    else
+        FILTER=""
+    fi
+    
+    echo -e "${CYAN}Filter rules: $FILTER${NC}"
+}
+
 # Run cpplint check
 run_cpplint_check() {
     echo -e "${BOLD}${BLUE}🔍 Running cpplint...${NC}"
     
-    # Set parameters (based on .arclint configuration)
-    ROOT_DIR="$target_dir"
-    FILTER="-build/c++11,-build/include_order,-runtime/references"
-    LINELENGTH="100"
+    # Parse .arclint configuration
+    parse_arclint_config
     
     # Find all C++ files in src directory
     FILES=$(find $target_dir -type f \( -name "*.h" -o -name "*.cc" -o -name "*.cpp" \))
@@ -121,11 +158,18 @@ run_cpplint_check() {
         return 0
     fi
     
-    # Run cpplint on all files at once for better performance
-    cpplint_output=$(cpplint --root="$ROOT_DIR" \
-                             --filter="$FILTER" \
-                             --linelength="$LINELENGTH" \
-                             $FILES 2>&1)
+    # Build cpplint command
+    CMD="cpplint --root=\"$target_dir\""
+    if [ -n "$FILTER" ]; then
+        CMD="$CMD --filter=\"$FILTER\""
+    fi
+    CMD="$CMD --linelength=\"$LINELENGTH\""
+    CMD="$CMD $FILES"
+    
+    echo -e "${CYAN}Running: $CMD${NC}"
+    
+    # Run cpplint
+    cpplint_output=$(eval $CMD 2>&1)
     cpplint_exit_code=$?
     
     # Count errors from output

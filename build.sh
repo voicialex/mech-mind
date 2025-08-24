@@ -1,205 +1,233 @@
 #!/bin/bash
 
-# Mech-Eye SDK 构建脚本
-# 解决 pkg-config 无法找到 MechEyeApi 和 LZ4 链接问题
+# =============================================================================
+# Perception App 统一构建脚本
+# =============================================================================
 
-set -e
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
 
-# 配置开关 (可修改)
-ENABLE_PCL=true      # 是否启用 PCL 功能
-ENABLE_HALCON=false  # 是否启用 Halcon 功能
-BUILD_TYPE="Release" # 构建类型: Debug/Release
+# 默认配置
+BUILD_TYPE="Release"
+BUILD_DIR="output/build"
+CLEAN_BUILD=false
+INSTALL_PREFIX="output/install"
+
+# 显示帮助信息
+show_help() {
+    echo -e "${BOLD}Perception App 构建脚本${NC}"
+    echo ""
+    echo "用法: $0 [选项]"
+    echo ""
+    echo "选项:"
+    echo "  -h, --help              显示此帮助信息"
+    echo "  -c, --clean             清理构建目录后全量编译"
+    echo ""
+    echo "示例:"
+    echo "  $0 -c                    # 清理构建目录后全量编译"
+    echo "  $0                       # 增量编译 (默认)"
+    echo ""
+}
 
 # 解析命令行参数
-CLEAN_BUILD=false
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -c|--clean)
-            CLEAN_BUILD=true
-            shift
-            ;;
-        -h|--help)
-            echo "用法: $0 [选项]"
-            echo "选项:"
-            echo "  -c, --clean    全量编译（清理构建目录）"
-            echo "  -h, --help     显示此帮助信息"
-            echo ""
-            echo "默认行为: 增量编译（保留构建目录）"
-            exit 0
-            ;;
-        *)
-            echo "未知参数: $1"
-            echo "使用 -h 查看帮助信息"
-            exit 1
-            ;;
-    esac
-done
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -c|--clean)
+                CLEAN_BUILD=true
+                shift
+                ;;
+            *)
+                echo -e "${RED}错误: 未知选项 $1${NC}"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
 
-# 获取脚本目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SDK_ROOT="$SCRIPT_DIR"
-
-# 设置输出目录
-OUTPUT_DIR="$SDK_ROOT/output"
-BUILD_DIR="$OUTPUT_DIR/build"
-INSTALL_DIR="$OUTPUT_DIR/install"
-
-echo "=== Mech-Eye SDK 构建脚本 ==="
-echo "SDK 目录: $SDK_ROOT"
-echo "输出目录: $OUTPUT_DIR"
-echo "构建目录: $BUILD_DIR"
-echo "安装目录: $INSTALL_DIR"
-echo "PCL 支持: $ENABLE_PCL"
-echo "Halcon 支持: $ENABLE_HALCON"
-echo "构建类型: $BUILD_TYPE"
-
-if [[ "$CLEAN_BUILD" == "true" ]]; then
-    echo "构建模式: 全量编译（清理构建目录）"
-else
-    echo "构建模式: 增量编译（保留构建目录）"
-fi
-
-# 检查必要文件
-if [ ! -f "$SDK_ROOT/thirdparty/lib/pkgconfig/MechEyeApi.pc" ]; then
-    echo "错误: 找不到 MechEyeApi.pc 文件"
-    exit 1
-fi
-
-# 设置环境变量
-export PKG_CONFIG_PATH="$SDK_ROOT/thirdparty/lib/pkgconfig:$PKG_CONFIG_PATH"
-export LD_LIBRARY_PATH="$SDK_ROOT/thirdparty/lib:$LD_LIBRARY_PATH"
-
-# 验证 MechEyeApi
-echo "验证 MechEyeApi..."
-if ! pkg-config --exists MechEyeApi; then
-    echo "错误: MechEyeApi 包配置未找到"
-    exit 1
-fi
-echo "✓ MechEyeApi 版本: $(pkg-config --modversion MechEyeApi)"
-
-# 检查 LZ4 版本
-LZ4_VERSION=$(pkg-config --modversion liblz4 2>/dev/null || echo "unknown")
-echo "系统 LZ4 版本: $LZ4_VERSION"
-
-# 根据配置设置编译参数
-if [[ "$ENABLE_PCL" == "true" ]]; then
-    USE_PCL="ON"
-    echo "启用 PCL 功能"
-else
-    USE_PCL="OFF"
-    echo "禁用 PCL 功能"
-fi
-
-if [[ "$ENABLE_HALCON" == "true" ]]; then
-    USE_HALCON="ON"
-    echo "启用 Halcon 功能"
-else
-    USE_HALCON="OFF"
-    echo "禁用 Halcon 功能"
-fi
-
-# 创建输出目录结构
-echo "创建输出目录..."
-mkdir -p "$BUILD_DIR"
-mkdir -p "$INSTALL_DIR"
-
-# 根据构建模式处理构建目录
-if [[ "$CLEAN_BUILD" == "true" ]]; then
-    # 全量编译：清理并重新创建构建目录
-    if [ -d "$BUILD_DIR" ]; then
-        echo "清理构建目录: $BUILD_DIR"
-        rm -rf "$BUILD_DIR"
+# 检查依赖
+check_dependencies() {
+    echo -e "${BOLD}${BLUE}🔍 检查依赖...${NC}"
+    
+    # 检查 CMake
+    if ! command -v cmake &> /dev/null; then
+        echo -e "${RED}错误: CMake 未找到，请先安装 CMake${NC}"
+        exit 1
     fi
-    mkdir -p "$BUILD_DIR"
-    echo "✓ 已清理构建目录，准备全量编译"
-else
-    # 增量编译：检查构建目录是否存在
-    if [ ! -d "$BUILD_DIR" ]; then
-        echo "构建目录不存在，创建新目录: $BUILD_DIR"
-        mkdir -p "$BUILD_DIR"
+    
+    # 检查编译器
+    if ! command -v g++ &> /dev/null && ! command -v clang++ &> /dev/null; then
+        echo -e "${RED}错误: C++ 编译器未找到，请安装 g++ 或 clang++${NC}"
+        exit 1
+    fi
+
+    export PKG_CONFIG_PATH="$PWD/thirdparty/lib/pkgconfig:$PKG_CONFIG_PATH"
+    export LD_LIBRARY_PATH="$PWD/thirdparty/lib:$LD_LIBRARY_PATH"
+    # 检查 MechEyeApi
+    if ! pkg-config --exists MechEyeApi; then
+        echo -e "${RED}错误: MechEyeApi 未找到，请先安装 MechEyeApi${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✓ 依赖检查通过${NC}"
+}
+
+# 清理构建目录
+clean_build() {
+    if [ "$CLEAN_BUILD" = true ]; then
+        echo -e "${BOLD}${YELLOW}🧹 清理构建目录...${NC}"
+        if [ -d "$BUILD_DIR" ]; then
+            rm -rf "$BUILD_DIR"
+            echo -e "${GREEN}✓ 构建目录已清理${NC}"
+        fi
     else
-        echo "✓ 使用现有构建目录进行增量编译"
+        echo -e "${CYAN}📝 使用增量编译模式${NC}"
     fi
-fi
+}
 
-cd "$BUILD_DIR"
-
-# 检查是否需要重新配置 CMake
-NEED_RECONFIGURE=true
-if [[ "$CLEAN_BUILD" == "false" ]] && [ -f "CMakeCache.txt" ]; then
-    echo "检查 CMake 配置..."
-    # 检查关键配置是否发生变化
-    if grep -q "USE_PCL:BOOL=$USE_PCL" CMakeCache.txt 2>/dev/null && \
-       grep -q "USE_HALCON:BOOL=$USE_HALCON" CMakeCache.txt 2>/dev/null && \
-       grep -q "CMAKE_BUILD_TYPE:STRING=$BUILD_TYPE" CMakeCache.txt 2>/dev/null; then
-        echo "✓ CMake 配置未变化，跳过重新配置"
-        NEED_RECONFIGURE=false
-    else
-        echo "CMake 配置已变化，需要重新配置"
+# 创建构建目录
+create_build_dir() {
+    echo -e "${BOLD}${BLUE}📁 准备构建目录...${NC}"
+    
+    # 检查是否在根目录，如果是则进入 perception_app 子目录
+    if [ -d "perception_app" ] && [ -f "perception_app/CMakeLists.txt" ]; then
+        echo -e "${CYAN}📁 进入 perception_app 目录${NC}"
+        cd perception_app
+    elif [ ! -f "CMakeLists.txt" ]; then
+        echo -e "${RED}错误: 找不到 CMakeLists.txt 文件${NC}"
+        echo -e "${RED}请确保在 mech-mind 根目录或 perception_app 目录中运行此脚本${NC}"
+        exit 1
     fi
-fi
+    
+    # 创建构建目录（相对于脚本所在位置）
+    mkdir -p "../$BUILD_DIR"
+    cd "../$BUILD_DIR"
+}
 
 # 配置 CMake
-if [[ "$NEED_RECONFIGURE" == "true" ]]; then
-    echo "配置 CMake..."
-    CMAKE_ARGS=(
-        -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-        -DUSE_OPENCV=ON
-        -DUSE_PCL=$USE_PCL
-        -DUSE_HALCON=$USE_HALCON
-        -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
-    )
-
-    # 如果启用 PCL，添加 LZ4 链接参数
-    if [[ "$USE_PCL" == "ON" ]]; then
-        CMAKE_ARGS+=(
-            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--no-as-needed -llz4"
-            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-as-needed -llz4"
-        )
+configure_cmake() {
+    echo -e "${BOLD}${BLUE}⚙️  配置 CMake...${NC}"
+    
+    # 检查是否需要重新配置
+    if [ "$CLEAN_BUILD" = true ] || [ ! -f "CMakeCache.txt" ]; then
+        # 构建 CMake 命令（使用 CMakeLists.txt 中的默认选项）
+        CMAKE_CMD="cmake ../../perception_app"
+        CMAKE_CMD="$CMAKE_CMD -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
+        CMAKE_CMD="$CMAKE_CMD -DCMAKE_INSTALL_PREFIX=../../output/install"
+        
+        echo -e "${CYAN}执行: $CMAKE_CMD${NC}"
+        
+        if ! eval $CMAKE_CMD; then
+            echo -e "${RED}❌ CMake 配置失败${NC}"
+            exit 1
+        fi
+        
+        echo -e "${GREEN}✓ CMake 配置成功${NC}"
+    else
+        echo -e "${CYAN}📝 使用现有 CMake 配置${NC}"
     fi
+}
 
-    # 使用绝对路径指向源码目录
-    SOURCE_DIR="$SDK_ROOT/perception_app"
-    cmake "$SOURCE_DIR" "${CMAKE_ARGS[@]}"
-    echo "✓ CMake 配置完成"
-fi
-
-# 编译
-echo "开始编译..."
-make -j$(nproc)
-
-# 手动安装到指定目录
-echo "开始安装..."
-echo "复制可执行文件到安装目录..."
-
-# 创建安装目录结构
-mkdir -p "$INSTALL_DIR"
-
-# 复制所有可执行文件
-find . -name "*" -type f -executable | grep -v CMake | while read -r file; do
-    if [ -f "$file" ] && [ -x "$file" ]; then
-        echo "安装: $file"
-        cp "$file" "$INSTALL_DIR/"
+# 编译项目
+build_project() {
+    echo -e "${BOLD}${BLUE}🔨 编译项目...${NC}"
+    
+    # 确定并行编译的线程数
+    if command -v nproc &> /dev/null; then
+        JOBS=$(nproc)
+    else
+        JOBS=4
     fi
-done
+    
+    BUILD_CMD="make -j$JOBS"
+    echo -e "${CYAN}执行: $BUILD_CMD${NC}"
+    
+    if ! eval $BUILD_CMD; then
+        echo -e "${RED}❌ 编译失败${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✓ 编译成功${NC}"
+}
 
-# 显示结果
-echo "✓ 编译完成！"
-echo "构建目录: $BUILD_DIR"
-echo "安装目录: $INSTALL_DIR"
-echo "编译的示例:"
-find . -name "*" -type f -executable | grep -v CMake | sort
+# 安装项目
+install_project() {
+    echo -e "${BOLD}${BLUE}📦 安装项目...${NC}"
+    
+    if ! make install; then
+        echo -e "${RED}❌ 安装失败${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✓ 安装成功${NC}"
+}
 
-echo "安装的示例:"
-find "$INSTALL_DIR" -name "*" -type f -executable 2>/dev/null | sort
-
-# 显示说明
-if [[ "$USE_PCL" == "OFF" ]]; then
+# 显示构建信息
+show_build_info() {
+    echo -e "${BOLD}${GREEN}🎉 构建完成！${NC}"
     echo ""
-    echo "注意: 已禁用 PCL 功能"
-    echo "如需启用，请修改脚本中的 ENABLE_PCL=true"
-fi
+    echo -e "${BOLD}构建信息:${NC}"
+    echo -e "  构建目录: ${CYAN}$BUILD_DIR${NC}"
+    echo -e "  构建模式: ${CYAN}$([ "$CLEAN_BUILD" = true ] && echo "全量编译" || echo "增量编译")${NC}"
+    echo -e "  安装目录: ${CYAN}$INSTALL_PREFIX${NC}"
+    
+    echo ""
+    echo -e "${BOLD}可执行文件位置:${NC}"
+    echo -e "  主程序: ${CYAN}$BUILD_DIR/binary/perception_app${NC}"
+    echo -e "  示例程序: ${CYAN}$BUILD_DIR/binary/${NC}"
+    
+    echo ""
+    echo -e "${BOLD}库文件位置:${NC}"
+    echo -e "  静态库: ${CYAN}$BUILD_DIR/lib/${NC}"
+}
 
-echo ""
-echo "=== 构建完成 ==="
-echo "所有文件已安装到: $INSTALL_DIR" 
+# 主函数
+main() {
+    echo -e "${BOLD}${BLUE}🚀 Perception App 构建脚本${NC}"
+    echo ""
+    
+    # 解析参数
+    parse_args "$@"
+    
+    # 显示配置
+    echo -e "${BOLD}构建配置:${NC}"
+    echo -e "  构建目录: $BUILD_DIR"
+    echo -e "  构建模式: $([ "$CLEAN_BUILD" = true ] && echo "全量编译" || echo "增量编译")"
+    echo -e "  安装目录: $INSTALL_PREFIX"
+    echo ""
+    
+    # 检查依赖
+    check_dependencies
+    
+    # 清理构建
+    clean_build
+    
+    # 创建构建目录
+    create_build_dir
+    
+    # 配置 CMake
+    configure_cmake
+    
+    # 编译项目
+    build_project
+    
+    # 安装项目
+    install_project
+    
+    # 显示构建信息
+    show_build_info
+}
+
+# 执行主函数
+main "$@" 

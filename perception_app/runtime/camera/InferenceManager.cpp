@@ -63,7 +63,9 @@ void InferenceManager::Cleanup() {
   is_initialized_ = false;
 }
 
-bool InferenceManager::IsInitialized() const { return is_initialized_ && inference_interface_ && inference_interface_->IsInitialized(); }
+bool InferenceManager::IsInitialized() const {
+  return is_initialized_ && inference_interface_ && inference_interface_->IsInitialized();
+}
 
 std::string InferenceManager::GetCurrentAlgorithmName() const {
   if (inference_interface_) {

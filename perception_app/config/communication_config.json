@@ -11,8 +11,7 @@
         "address": "127.0.0.1",
         "port": 9090,
         "max_clients": 100,
-        "client_timeout": 30000,
-        "heartbeat_interval": 30000
+        "client_timeout": 30000
     },
     "client": {
         "id": "device_client_001",
@@ -22,15 +21,19 @@
         "enable_auto_reconnect": true,
         "max_reconnect_attempts": 10,
         "reconnect_interval": 5000,
-        "connection_check_interval": 10000,
-        "heartbeat_interval": 30000
+        "connection_check_interval": 10000
+    },
+    "heartbeat": {
+        "enable": true,
+        "interval": 300,
+        "timeout_multiplier": 3,
+        "max_missed_responses": 3
     },
     "master_node": {
         "client_timeout_interval": 60000,
         "status_check_interval": 10000,
         "state_sync_interval": 5000,
-        "enable_auto_cleanup": true,
-        "enable_heartbeat": true
+        "enable_auto_cleanup": true
     },
     "message": {
         "max_payload_size": 65536,

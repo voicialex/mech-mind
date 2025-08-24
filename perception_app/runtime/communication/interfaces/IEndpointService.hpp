@@ -104,7 +104,7 @@ public:
      * @brief 获取配置
      * @return 配置
      */
-    virtual const EndpointConfig& GetConfig() const = 0;
+    virtual const EndpointIdentity& GetConfig() const = 0;
     
     /**
      * @brief 检查是否正在运行

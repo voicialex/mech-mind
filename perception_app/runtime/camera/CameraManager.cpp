@@ -14,7 +14,8 @@
 CameraManager::CameraManager() {
   // Create display window
   if (ConfigHelper::getInstance().camera_config_.render.enable) {
-    display_window_ = std::make_unique<CVWindow>(ConfigHelper::getInstance().camera_config_.render.window_title, ConfigHelper::getInstance().camera_config_.render.window_width,
+    display_window_ = std::make_unique<CVWindow>(ConfigHelper::getInstance().camera_config_.render.window_title,
+                                                 ConfigHelper::getInstance().camera_config_.render.window_width,
                                                  ConfigHelper::getInstance().camera_config_.render.window_height);
     LOG_INFO_STREAM << "Real-time display window initialized";
   }
@@ -143,12 +144,15 @@ void CameraManager::SaveImages(FrameSet &frame, const std::string &suffix) {
   // Point cloud
   if (ConfigHelper::getInstance().camera_config_.save.save_point_cloud) {
     std::string pointCloudFile = ConfigHelper::getInstance().camera_config_.save.save_point_cloud_file(suffix);
-    showError(frame.frame2DAnd3D.frame3D().saveUntexturedPointCloud(mmind::eye::FileFormat::PLY, pointCloudFile), "Capture and save the untextured point cloud: " + pointCloudFile);
+    showError(frame.frame2DAnd3D.frame3D().saveUntexturedPointCloud(mmind::eye::FileFormat::PLY, pointCloudFile),
+              "Capture and save the untextured point cloud: " + pointCloudFile);
     file_names.push_back(pointCloudFile);
   }
   if (ConfigHelper::getInstance().camera_config_.save.save_textured_point_cloud) {
-    std::string texturedPointCloudFile = ConfigHelper::getInstance().camera_config_.save.save_textured_point_cloud_file(suffix);
-    showError(frame.frame2DAnd3D.saveTexturedPointCloud(mmind::eye::FileFormat::PLY, texturedPointCloudFile), "Capture and save the textured point cloud: " + texturedPointCloudFile);
+    std::string texturedPointCloudFile =
+        ConfigHelper::getInstance().camera_config_.save.save_textured_point_cloud_file(suffix);
+    showError(frame.frame2DAnd3D.saveTexturedPointCloud(mmind::eye::FileFormat::PLY, texturedPointCloudFile),
+              "Capture and save the textured point cloud: " + texturedPointCloudFile);
     file_names.push_back(texturedPointCloudFile);
   }
 
@@ -187,13 +191,15 @@ bool CameraManager::EnableInference(const std::string &config_path) {
   }
 
   // Determine config file path
-  std::string actual_config_path = config_path.empty() ? ConfigHelper::getInstance().inference_config_.config_path : config_path;
+  std::string actual_config_path =
+      config_path.empty() ? ConfigHelper::getInstance().inference_config_.config_path : config_path;
 
   LOG_INFO_STREAM << "Enabling inference, config file: " << actual_config_path;
 
   if (InferenceManager::getInstance().InitializeInference(actual_config_path)) {
     inference_enabled_ = true;
-    LOG_INFO_STREAM << "Inference enabled successfully, algorithm: " << InferenceManager::getInstance().GetCurrentAlgorithmName();
+    LOG_INFO_STREAM << "Inference enabled successfully, algorithm: "
+                    << InferenceManager::getInstance().GetCurrentAlgorithmName();
     return true;
   } else {
     LOG_ERROR_STREAM << "Failed to enable inference";

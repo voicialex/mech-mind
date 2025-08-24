@@ -5,9 +5,11 @@
       "severity": {
         "build/c++11": "disabled",
         "build/include_order": "disabled",
-        "runtime/references":"disabled"
+        "runtime/references": "disabled",
+        "legal/copyright": "disabled",
+        "whitespace/line_length": "disabled"
       },
-    "flags":["--root=perception_app", "--linelength=200"],
+      "flags": ["--root=perception_app", "--linelength=120"],
       "include": ["(\\.h$)", "(\\.cc$)", "(\\.cpp$)"],
       "exclude": ["(perception_app/include)"]
     }

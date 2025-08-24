@@ -10,7 +10,8 @@
 
 const std::string defaultKeyMapPrompt = "'Esc': Exit Window, '?': Show Key Map";
 
-CVWindow::CVWindow(std::string name, uint32_t width, uint32_t height) : name_(name), width_(width), height_(height), closed_(false) {
+CVWindow::CVWindow(std::string name, uint32_t width, uint32_t height)
+    : name_(name), width_(width), height_(height), closed_(false) {
 #if defined(TO_DISABLE_OPENCV_LOG)
   cv::utils::logging::setLogLevel(cv::utils::logging::LogLevel::LOG_LEVEL_SILENT);
 #endif
@@ -40,7 +41,8 @@ void CVWindow::showFrame2DAnd3D(const mmind::eye::Frame2DAnd3D &frame) {
     int targetHeight = 480;
     cv::Mat resizedColor, resizedDepth;
     cv::resize(colorMat, resizedColor, cv::Size(colorMat.cols * targetHeight / colorMat.rows, targetHeight));
-    cv::resize(depthColorMat, resizedDepth, cv::Size(depthColorMat.cols * targetHeight / depthColorMat.rows, targetHeight));
+    cv::resize(depthColorMat, resizedDepth,
+               cv::Size(depthColorMat.cols * targetHeight / depthColorMat.rows, targetHeight));
 
     // Horizontal concatenation
     cv::hconcat(resizedColor, resizedDepth, combined);
